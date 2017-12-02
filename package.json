@@ -1,0 +1,33 @@
+{
+  "name": "esyb",
+  "version": "0.1.0",
+  "description": "Sandbox builder for esy",
+  "license": "MIT",
+  "esy": {
+    "build": [
+      "jbuilder build"
+    ],
+    "install": [
+      "esy-installer"
+    ],
+    "buildsInSource": "_build"
+  },
+  "resolutions": {
+    "**/@opam/reason": "link:./reason",
+    "@opam/reason": "link:./reason"
+  },
+  "dependencies": {
+    "@esy-ocaml/esy-installer": "^0.0.0",
+    "@opam/bos": "^0.1.6",
+    "@opam/jbuilder": "^1.0.0-beta14",
+    "@opam/ppx_let": "^100000000.9.0",
+    "@opam/reason": "link:./reason"
+  },
+  "peerDependencies": {
+    "ocaml": "~4.6.0"
+  },
+  "devDependencies": {
+    "@opam/merlin": "^3.0.3",
+    "ocaml": "~4.6.0"
+  }
+}

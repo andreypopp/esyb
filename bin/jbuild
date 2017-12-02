@@ -1,0 +1,8 @@
+(jbuild_version 1)
+
+(executable
+ ((name esyb)
+  (public_name esyb)
+  (modes (byte))
+  (preprocess (pps (ppx_let)))
+  (libraries (bos))))

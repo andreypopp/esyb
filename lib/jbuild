@@ -1,0 +1,8 @@
+(jbuild_version 1)
+
+(library (
+ (name EsyLib)
+ (public_name EsyLib)
+ (modes (byte))
+ (preprocess (pps (ppx_import ppx_deriving_yojson ppx_deriving.std ppx_let)))
+ (libraries (bos ppx_deriving_yojson.runtime logs))))

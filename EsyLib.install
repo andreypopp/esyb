@@ -1,0 +1,23 @@
+lib: [
+  "_build/install/default/lib/EsyLib/META" {"META"}
+  "_build/install/default/lib/EsyLib/opam" {"opam"}
+  "_build/install/default/lib/EsyLib/EsyLib__BuildSpec.cmi"
+  "_build/install/default/lib/EsyLib/EsyLib__BuildSpec.cmt"
+  "_build/install/default/lib/EsyLib/BuildSpec.re"
+  "_build/install/default/lib/EsyLib/EsyLib__Builder.cmi"
+  "_build/install/default/lib/EsyLib/EsyLib__Builder.cmt"
+  "_build/install/default/lib/EsyLib/Builder.re"
+  "_build/install/default/lib/EsyLib/EsyLib.cmi"
+  "_build/install/default/lib/EsyLib/EsyLib.cmt"
+  "_build/install/default/lib/EsyLib/EsyLib.ml-gen"
+  "_build/install/default/lib/EsyLib/EsyLib__Result.cmi"
+  "_build/install/default/lib/EsyLib/EsyLib__Result.cmt"
+  "_build/install/default/lib/EsyLib/Result.re"
+  "_build/install/default/lib/EsyLib/EsyLib.cma"
+]
+bin: [
+  "_build/install/default/bin/esyb" {"esyb"}
+]
+doc: [
+  "_build/install/default/doc/EsyLib/README.md"
+]

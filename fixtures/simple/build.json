@@ -1,0 +1,19 @@
+{
+  "id": "pkg-1.0.0-somehash",
+  "name": "pkg",
+  "version": "1.0.0",
+  "sourceType": "immutable",
+  "buildType": "in-source",
+  "build": [
+    [
+      "echo",
+      "build"
+    ]
+  ],
+  "install": [
+    [
+      "echo",
+      "install"
+    ]
+  ]
+}

@@ -1,37 +1,45 @@
-/**
- * Add monadic syntax handlers for Result.
- */
-module Result = {
-  include Rresult;
-  module Let_syntax = {
-    let bind = (~f, v) =>
-      switch v {
-      | Ok(v) => f(v)
-      | Error(e) => Error(e)
-      };
-    module Open_on_rhs = {
-      let return = (v) => Ok(v);
-    };
+open EsyLib;
+
+module File = Bos.OS.File;
+
+module Dir = Bos.OS.Dir;
+
+let parseWith = (parser, data) => {
+  let json = Yojson.Safe.from_string(data);
+  switch (parser(json)) {
+  | Ok(value) => Ok(value)
+  | Error(msg) => Error(`Msg(msg))
   };
 };
 
-let listdir = (path) => {
-  open Result;
-  print_endline("Directory: " ++ path);
-  let files = do Bos.OS.Dir.contents(Fpath.v(path));
-  let lines =
-    files |> List.map((file) => Fpath.to_string(file)) |> String.concat("\n");
-  print_endline(lines);
-  Ok();
-};
-
-let main = () =>
+let ofFile = (path: Fpath.t) =>
   Result.(
     {
-      do listdir(".");
-      do listdir("node_modules");
+      let data = do File.read(path);
+      print_endline(data);
+      parseWith(BuildSpec.of_yojson, data);
+    }
+  );
+
+let exitOnError = (r) =>
+  switch r {
+  | Error(`Msg(msg)) =>
+    print_endline(msg);
+    exit(1);
+  | _ => ()
+  };
+
+let main = () => {
+  Logs.set_reporter(Logs_fmt.reporter());
+  exitOnError(
+    {
+      open Result;
+      let buildPath = Fpath.(v("fixtures") / "simple" / "build.json");
+      let spec = do ofFile(buildPath);
+      do Builder.build(spec);
       Ok();
     }
   );
+};
 
 main();

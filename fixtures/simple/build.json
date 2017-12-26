@@ -8,6 +8,9 @@
     [
       "echo",
       "build"
+    ],
+    [
+      "env"
     ]
   ],
   "install": [

@@ -46,6 +46,26 @@ module Fpath = struct
     | _ -> Error "invalid path"
 end
 
+module Env = struct
+  type t = Bos.OS.Env.t
+
+  let pp _fmt _env = ()
+
+  let of_yojson (json : Yojson.Safe.json) =
+    match json with
+    | `Assoc items ->
+      let add_to_map res (key, value) =
+        match res, value with
+        | Ok res, `String value ->
+          Ok (Astring.String.Map.add key value res)
+        | _ ->
+          Error "expected a string value"
+      in
+      List.fold_left add_to_map (Ok Astring.String.Map.empty) items
+    | _ -> Error "expected object"
+
+end
+
 type t = {
   id: string;
   name: string;
@@ -58,9 +78,11 @@ type t = {
   stageDir: Fpath.t;
   installDir: Fpath.t;
   buildDir: Fpath.t;
+  env : Env.t;
 } [@@deriving (show, of_yojson)]
 
 let ofFile (path : Fpath.t) = Run.(
   let%bind data = Bos.OS.File.read path in
-  Json.parseWith of_yojson data
+  let%bind spec = Json.parseWith of_yojson data in
+  Ok spec
 )

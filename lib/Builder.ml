@@ -107,11 +107,11 @@ let build (spec : BuildSpec.t) =
     Sandbox.sandboxExec { allowWrite = sandboxConfig }
   in
 
-  let rec runCommands commands =
+  let rec runCommands env commands =
     match commands with
     | [] -> Ok ()
-    | cmd::cmds -> (match commandExec cmd with
-      | Ok _ -> runCommands cmds
+    | cmd::cmds -> (match commandExec ~env cmd with
+      | Ok _ -> runCommands env cmds
       | Error err -> Error err)
   in
 
@@ -146,8 +146,8 @@ let build (spec : BuildSpec.t) =
   let%bind localStore = Store.create config.localStorePath in
 
   let runCommands () =
-    let%bind () = runCommands spec.build in
-    let%bind () = runCommands spec.install in
+    let%bind () = runCommands spec.env spec.build in
+    let%bind () = runCommands spec.env spec.install in
     ok
   in
   let%bind () = prepare () in

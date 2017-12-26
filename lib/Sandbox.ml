@@ -32,12 +32,12 @@ module Darwin = struct
     let configData = renderConfig config in
     let%bind configFilename = Bos.OS.File.tmp "%s" in
     let%bind () = Bos.OS.File.write configFilename configData in
-    let exec command =
+    let exec ~env command =
       let sandboxCommand = Bos.Cmd.of_list [
         "sandbox-exec"; "-f"; Fpath.to_string configFilename
       ] in
       let command = Bos.Cmd.(sandboxCommand %% command) in
-      Bos.OS.Cmd.run command
+      Bos.OS.Cmd.run ~env command
     in Ok exec
   )
 end
@@ -45,11 +45,11 @@ end
 module NoSandbox = struct
 
   let sandboxExec _config =
-    let exec command = Bos.OS.Cmd.run command
+    let exec ~env command = Bos.OS.Cmd.run ~env command
     in Ok exec
 end
 
-let sandboxExec config =
+let sandboxExec ?(env=Astring.String.Map.empty) config =
   match Run.uname () with
   | "darwin" -> Darwin.sandboxExec config
   | _ -> NoSandbox.sandboxExec config

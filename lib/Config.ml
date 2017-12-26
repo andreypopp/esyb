@@ -7,6 +7,7 @@ type t = {
 let storeInstallTree = "i"
 let storeBuildTree = "b"
 let storeStageTree = "s"
+
 let storeVersion = "3"
 
 let maxStorePaddingLength =
@@ -20,6 +21,12 @@ let maxStorePaddingLength =
   - String.length "!#"
   - String.length ("/" ^ storeVersion ^ "/" ^ storeInstallTree ^ "/" ^ ocamlrunStorePath)
 
+(**
+ * Initialize config optionally with prefixPath and sandboxPath.
+ *
+ * If prefixPath is not provided then ~/.esy is used.
+ * If sandboxPath is not provided then $PWD us used.
+ *)
 let create ~prefixPath ~sandboxPath () = Run.(
   let%bind prefixPath = match prefixPath with
   | Some v -> Ok v

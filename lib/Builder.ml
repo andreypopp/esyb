@@ -26,6 +26,7 @@ let bindSpecToConfig (config : Config.t) (spec : BuildSpec.t) =
   let env = function
   | "sandbox" -> Some (Fpath.to_string config.sandboxPath)
   | "store" -> Some (Fpath.to_string config.storePath)
+  | "localStore" -> Some (Fpath.to_string config.localStorePath)
   | _ -> None
   in
   let%bind installDir = PathSyntax.render env spec.installDir in

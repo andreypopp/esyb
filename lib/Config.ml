@@ -9,15 +9,16 @@ let storeBuildTree = "b"
 let storeStageTree = "s"
 let storeVersion = "3"
 
-let maxShebangLength = 127
-let ocamlrunStorePath = "ocaml-n.00.000-########/bin/ocamlrun"
-
-let storePaddingLength = maxShebangLength
+let maxStorePaddingLength =
+  (* This is restricted by POSIX, Linux enforces this but macOS is more
+   * forgiving. *)
+  let maxShebangLength = 127 in
+  (* We reserve that amount of chars from padding so ocamlrun can be placed i
+   * shebang lines *)
+  let ocamlrunStorePath = "ocaml-n.00.000-########/bin/ocamlrun" in
+  maxShebangLength
   - String.length "!#"
-  - String.length ("/" ^ storeInstallTree ^ "/" ^ ocamlrunStorePath)
-
-let storePadding =
-  String.make storePaddingLength '_'
+  - String.length ("/" ^ storeVersion ^ "/" ^ storeInstallTree ^ "/" ^ ocamlrunStorePath)
 
 let create ~prefixPath ~sandboxPath () = Run.(
   let%bind prefixPath = match prefixPath with
@@ -32,8 +33,8 @@ let create ~prefixPath ~sandboxPath () = Run.(
     Bos.OS.Dir.current ()
   in
   let storePadding =
-    let prefixPathLength = String.length (Fpath.to_string (prefixPath / storeVersion)) in
-    let paddingLength = storePaddingLength - prefixPathLength in
+    let prefixPathLength = String.length (Fpath.to_string prefixPath) in
+    let paddingLength = maxStorePaddingLength - prefixPathLength in
     String.make paddingLength '_'
   in
   let storePath = prefixPath / (storeVersion ^ storePadding) in

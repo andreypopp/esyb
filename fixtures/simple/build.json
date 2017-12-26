@@ -15,5 +15,9 @@
       "echo",
       "install"
     ]
-  ]
+  ],
+  "sourceDir": "%sandbox%",
+  "stageDir": "%sandbox%/node_modules/.cache/esystore/s/name",
+  "installDir": "%sandbox%/node_modules/.cache/esystore/i/name",
+  "buildDir": "%sandbox%/node_modules/.cache/esystore/b/name"
 }

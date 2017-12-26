@@ -3,14 +3,18 @@ open EsyLib
 module File = Bos.OS.File
 module Dir = Bos.OS.Dir
 
-let runToTerm r =
-  match r with
-  | Error (`Msg msg) -> `Error (false, msg)
-  | _ -> `Ok ()
+type verb = Normal | Quiet | Verbose
 
-let build _copts =
-  Logs.app (fun m -> m "Hello horrible world!");
-  runToTerm Run.(
+type commonOptions = {
+  debug : bool;
+  verb : verb;
+  prefixPath : Fpath.t option;
+  sandboxPath : Fpath.t option;
+}
+
+let build config =
+  print_endline (Config.show config);
+  Run.(
     let buildPath = v "fixtures" / "simple" / "build.json" in
     let%bind spec = BuildSpec.ofFile buildPath in
     let%bind () = Builder.build spec in
@@ -18,21 +22,21 @@ let build _copts =
   )
 
 let shell _copts =
-  Logs.set_reporter (Logs_fmt.reporter ());
-  runToTerm (Ok ())
+  Ok ()
 
 let exec _copts =
+  Ok ()
+
+let runToCompletion command (copts : commonOptions) =
   Logs.set_reporter (Logs_fmt.reporter ());
-  runToTerm (Ok ())
-
-type verb = Normal | Quiet | Verbose
-
-type commonOptions = {
-  debug : bool;
-  verb : verb;
-  prefixPath : string option;
-  sandboxPath : string option;
-}
+  let run = Run.(
+    let {prefixPath; sandboxPath} = copts in
+    let%bind config = Config.create ~prefixPath ~sandboxPath () in
+    command config
+  ) in
+  match run with
+  | Error (`Msg msg) -> `Error (false, msg)
+  | _ -> `Ok ()
 
 let help _copts man_format cmds topic =
   match topic with
@@ -69,6 +73,12 @@ let () =
     debug; verb; prefixPath; sandboxPath
   } in
 
+  let path =
+    let parse = Fpath.of_string in
+    let print = Fpath.pp in
+    Arg.conv ~docv:"PATH" (parse, print)
+  in
+
   let copts_t =
     let docs = Manpage.s_common_options in
     let debug =
@@ -85,12 +95,12 @@ let () =
     let prefixPath =
       let doc = "Specifies esy prefix path." in
       let env = Arg.env_var "ESY__PREFIX" ~doc in
-      Arg.(value & opt (some string) None & info ["P"; "prefix-path"] ~env ~docv:"PATH" ~doc)
+      Arg.(value & opt (some path) None & info ["P"; "prefix-path"] ~env ~docv:"PATH" ~doc)
     in
     let sandboxPath =
       let doc = "Specifies esy sandbox path." in
       let env = Arg.env_var "ESY__SANDBOX" ~doc in
-      Arg.(value & opt (some string) None & info ["S"; "sandbox-path"] ~env ~docv:"PATH" ~doc)
+      Arg.(value & opt (some path) None & info ["S"; "sandbox-path"] ~env ~docv:"PATH" ~doc)
     in
     Term.(const commonOptions $ debug $ verb $ prefixPath $ sandboxPath)
   in
@@ -102,7 +112,7 @@ let () =
     let sdocs = Manpage.s_common_options in
     let exits = Term.default_exits in
     let man = help_secs in
-    Term.(ret (const build $ copts_t)),
+    Term.(ret (const (runToCompletion build) $ copts_t)),
     Term.info "esyb" ~version:"v0.1.0" ~doc ~sdocs ~exits ~man
   in
 
@@ -111,7 +121,7 @@ let () =
     let sdocs = Manpage.s_common_options in
     let exits = Term.default_exits in
     let man = help_secs in
-    Term.(ret (const build $ copts_t)),
+    Term.(ret (const (runToCompletion build) $ copts_t)),
     Term.info "build" ~doc ~sdocs ~exits ~man
   in
 
@@ -120,7 +130,7 @@ let () =
     let sdocs = Manpage.s_common_options in
     let exits = Term.default_exits in
     let man = help_secs in
-    Term.(ret (const shell $ copts_t)),
+    Term.(ret (const (runToCompletion shell) $ copts_t)),
     Term.info "shell" ~doc ~sdocs ~exits ~man
   in
 
@@ -129,7 +139,7 @@ let () =
     let sdocs = Manpage.s_common_options in
     let exits = Term.default_exits in
     let man = help_secs in
-    Term.(ret (const shell $ copts_t)),
+    Term.(ret (const (runToCompletion exec) $ copts_t)),
     Term.info "exec" ~doc ~sdocs ~exits ~man
   in
 

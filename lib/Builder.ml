@@ -150,6 +150,8 @@ let build (spec : BuildSpec.t) =
     let%bind () = runCommands spec.env spec.install in
     ok
   in
+
   let%bind () = prepare () in
   let%bind () = withCwd rootDir runCommands
+
   in ok

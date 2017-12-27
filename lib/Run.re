@@ -21,6 +21,10 @@ let rmdir = path => Bos.OS.Dir.delete(~recurse=true, path);
 
 let rm = path => Bos.OS.File.delete(path);
 
+let symlink = Bos.OS.Path.symlink;
+
+let symlink_target = Bos.OS.Path.symlink_target;
+
 let uname = () => {
   let ic = Unix.open_process_in("uname");
   let uname = input_line(ic);

@@ -22,6 +22,11 @@
       "bash",
       "-c",
       "echo $cur__install/path > $cur__install/test"
+    ],
+    [
+      "bash",
+      "-c",
+      "ln -s $cur__install/test $cur__install/testlink"
     ]
   ],
   "sourceDir": "%sandbox%",

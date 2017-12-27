@@ -40,7 +40,17 @@ let relocateInstallDir = (config: Config.t, spec: BuildSpec.t) => {
       );
     Bos.OS.Cmd.run(cmd);
   };
-  let rewriteTargetInSymlink = (~origPrefix, ~destPrefix, path) => Ok();
+  let rewriteTargetInSymlink = (~origPrefix, ~destPrefix, path) => {
+    let%bind targetPath = symlink_target(path);
+    switch (Fpath.rem_prefix(origPrefix, targetPath)) {
+    | Some(basePath) =>
+      let nextTargetPath = Fpath.append(destPrefix, basePath);
+      let%bind () = rm(path);
+      let%bind () = symlink(~target=nextTargetPath, path);
+      ok;
+    | None => ok
+    };
+  };
   let relocate = (path: Fpath.t, stats: Unix.stats) =>
     switch stats.st_kind {
     | Unix.S_REG =>

@@ -21,20 +21,20 @@
     [
       "bash",
       "-c",
-      "echo $cur__install/path > $cur__install/test"
+      "echo %localStore%/s/name/path > %localStore%/s/name/test"
     ],
     [
       "bash",
       "-c",
-      "ln -s $cur__install/test $cur__install/testlink"
+      "ln -s %localStore%/s/name/test %localStore%/s/name/testlink"
     ]
   ],
   "sourceDir": "%sandbox%",
-  "stageDir": "%sandbox%/node_modules/.cache/esystore/s/name",
-  "installDir": "%sandbox%/node_modules/.cache/esystore/i/name",
-  "buildDir": "%sandbox%/node_modules/.cache/esystore/b/name",
+  "stageDir": "%localStore%/s/name",
+  "installDir": "%localStore%/i/name",
+  "buildDir": "%localStore%/b/name",
   "env": {
     "cur__name": "pkg",
-    "cur__install": "%sandbox%/node_modules/.cache/esystore/s/name"
+    "cur__install": "%localStore%/s/name"
   }
 }

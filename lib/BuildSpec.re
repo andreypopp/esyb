@@ -88,11 +88,27 @@ type t = {
   env: Env.t
 };
 
-let ofFile = (path: Fpath.t) =>
+let bindSpecToConfig = (config: Config.t, spec: t) => {
+  open Result;
+  let env =
+    fun
+    | "sandbox" => Some(Fpath.to_string(config.sandboxPath))
+    | "store" => Some(Fpath.to_string(config.storePath))
+    | "localStore" => Some(Fpath.to_string(config.localStorePath))
+    | _ => None;
+  let%bind installDir = PathSyntax.render(env, spec.installDir);
+  let%bind stageDir = PathSyntax.render(env, spec.stageDir);
+  let%bind buildDir = PathSyntax.render(env, spec.buildDir);
+  let%bind sourceDir = PathSyntax.render(env, spec.sourceDir);
+  Ok({...spec, installDir, stageDir, buildDir, sourceDir});
+};
+
+let ofFile = (config: Config.t, path: Fpath.t) =>
   Run.(
     {
       let%bind data = Bos.OS.File.read(path);
       let%bind spec = Json.parseWith(of_yojson, data);
+      let%bind spec = bindSpecToConfig(config, spec);
       Ok(spec);
     }
   );

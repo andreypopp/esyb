@@ -1,41 +1,3 @@
-module PathSyntax = {
-  let re = Re.(compile(seq([char('%'), group(rep1(alnum)), char('%')])));
-  let render = (env, path: Fpath.t) => {
-    open Result;
-    let replace = g => {
-      let name = Re.Group.get(g, 1);
-      switch (env(name)) {
-      | None => raise(Not_found)
-      | Some(value) => value
-      };
-    };
-    let path = Fpath.to_string(path);
-    let%bind path =
-      try (Ok(Re.replace(~all=true, re, path, ~f=replace))) {
-      | Not_found =>
-        let msg = Printf.sprintf("unable to render path: %s", path);
-        Error(`Msg(msg));
-      };
-    Fpath.of_string(path);
-  };
-};
-
-let bindSpecToConfig = (config: Config.t, spec: BuildSpec.t) => {
-  open Result;
-  open BuildSpec;
-  let env =
-    fun
-    | "sandbox" => Some(Fpath.to_string(config.sandboxPath))
-    | "store" => Some(Fpath.to_string(config.storePath))
-    | "localStore" => Some(Fpath.to_string(config.localStorePath))
-    | _ => None;
-  let%bind installDir = PathSyntax.render(env, spec.installDir);
-  let%bind stageDir = PathSyntax.render(env, spec.stageDir);
-  let%bind buildDir = PathSyntax.render(env, spec.buildDir);
-  let%bind sourceDir = PathSyntax.render(env, spec.sourceDir);
-  Ok({...spec, installDir, stageDir, buildDir, sourceDir});
-};
-
 let rsync = (origDir, destDir) => {
   let s = Fpath.to_string;
   let cmd = [
@@ -54,6 +16,10 @@ let rsync = (origDir, destDir) => {
     "_esybuild",
     "--exclude",
     "_esyinstall",
+    /* The trailing "/" is important as it makes rsync to sync the contents of
+     * origDir rather than the origDir itself into destDir, see "man rsync" for
+     * details.
+     */
     s(origDir) ++ "/",
     s(destDir)
   ];
@@ -61,20 +27,14 @@ let rsync = (origDir, destDir) => {
   Bos.OS.Cmd.run(cmd);
 };
 
-let build = (spec: BuildSpec.t) => {
+let withBuildEnv = (config: Config.t, spec: BuildSpec.t, run) => {
   open Run;
-  open BuildSpec;
-  let config = {
-    Config.sandboxPath: v("."),
-    storePath: v("esystore"),
-    localStorePath: v(".") / "node_modules" / ".cache" / "esystore"
-  };
-  let%bind spec = bindSpecToConfig(config, spec);
   let relocateSources = () => rsync(spec.sourceDir, spec.buildDir);
   let relocateBuildDir = () => ok;
   let relocateBuildDirCleanup = () => ok;
+  let relocateInstallDir = () => ok;
   let doNothing = () => ok;
-  let {sourceDir, installDir, buildDir, stageDir, _} = spec;
+  let {BuildSpec.sourceDir, installDir, buildDir, stageDir, _} = spec;
   let (rootDir, prepareRootDir, completeRootDir) =
     switch (spec.buildType, spec.sourceType) {
     | (InSource, _) => (buildDir, relocateSources, doNothing)
@@ -110,15 +70,18 @@ let build = (spec: BuildSpec.t) => {
     ];
   };
   let%bind commandExec = Sandbox.sandboxExec({allowWrite: sandboxConfig});
-  let rec runCommands = (env, commands) =>
+  let rec runCommands = commands =>
     switch commands {
     | [] => Ok()
     | [cmd, ...cmds] =>
-      switch (commandExec(~env, cmd)) {
-      | Ok(_) => runCommands(env, cmds)
+      switch (commandExec(~env=spec.env, cmd)) {
+      | Ok(_) => runCommands(cmds)
       | Error(err) => Error(err)
       }
     };
+  /*
+   * Prepare build/install.
+   */
   let prepare = () => {
     let%bind () = mkdir(installDir);
     let%bind () = mkdir(stageDir);
@@ -142,14 +105,32 @@ let build = (spec: BuildSpec.t) => {
     let%bind () = mkdir(buildDir / "_esy" / "log");
     ok;
   };
+  /*
+   * Finalize build/install.
+   */
+  let finalize = result =>
+    switch result {
+    | Ok () =>
+      let%bind () = relocateInstallDir();
+      let%bind () = completeRootDir();
+      ok;
+    | error => error
+    };
   let%bind store = Store.create(config.storePath);
   let%bind localStore = Store.create(config.localStorePath);
-  let runCommands = () => {
-    let%bind () = runCommands(spec.env, spec.build);
-    let%bind () = runCommands(spec.env, spec.install);
+  let%bind () = prepare();
+  let result = withCwd(rootDir, run(runCommands));
+  let%bind () = finalize(result);
+  result;
+};
+
+let build = (config, spec) => {
+  open Run;
+  let runBuildAndInstall = (run, ()) => {
+    let {BuildSpec.build, install} = spec;
+    let%bind () = run(build);
+    let%bind () = run(install);
     ok;
   };
-  let%bind () = prepare();
-  let%bind () = withCwd(rootDir, runCommands);
-  ok;
+  withBuildEnv(config, spec, runBuildAndInstall);
 };

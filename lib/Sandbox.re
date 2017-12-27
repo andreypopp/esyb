@@ -37,8 +37,7 @@ module Darwin = {
   let sandboxExec = config => {
     open Run;
     let configData = renderConfig(config);
-    let%bind configFilename = Bos.OS.File.tmp("%s");
-    let%bind () = Bos.OS.File.write(configFilename, configData);
+    let%bind configFilename = putTempFile(configData);
     let exec = (~env, command) => {
       let sandboxCommand =
         Bos.Cmd.of_list([

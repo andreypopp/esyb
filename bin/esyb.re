@@ -9,7 +9,7 @@ type verb =
   | Quiet
   | Verbose;
 
-type commonOptions = {
+type commonOpts = {
   debug: bool,
   verb,
   buildPath: option(Fpath.t),
@@ -17,18 +17,18 @@ type commonOptions = {
   sandboxPath: option(Fpath.t)
 };
 
-let build = (copts: commonOptions) => {
+let build = (~buildOnly=false, copts: commonOpts) => {
   open Run;
   Logs.set_reporter(Logs_fmt.reporter());
   let {prefixPath, sandboxPath, buildPath} = copts;
   let buildPath = Option.orDefault(v("build.json"), buildPath);
   let%bind config = Config.create(~prefixPath, ~sandboxPath, ());
   let%bind spec = BuildSpec.ofFile(config, buildPath);
-  let%bind () = Builder.build(config, spec);
+  let%bind () = Builder.build(~buildOnly, config, spec);
   Ok();
 };
 
-let shell = (copts: commonOptions) => {
+let shell = (copts: commonOpts) => {
   open Run;
   Logs.set_reporter(Logs_fmt.reporter());
   let {prefixPath, sandboxPath, buildPath} = copts;
@@ -108,7 +108,7 @@ let () = {
     `P("Check bug reports at https://github.com/esy/esy.")
   ];
   /* Options common to all commands */
-  let commonOptions = (debug, verb, prefixPath, sandboxPath, buildPath) => {
+  let commonOpts = (debug, verb, prefixPath, sandboxPath, buildPath) => {
     debug,
     verb,
     prefixPath,
@@ -120,7 +120,7 @@ let () = {
     let print = Fpath.pp;
     Arg.conv(~docv="PATH", (parse, print));
   };
-  let copts_t = {
+  let commonOptsT = {
     let docs = Manpage.s_common_options;
     let debug = {
       let doc = "Give only debug output.";
@@ -139,7 +139,7 @@ let () = {
       Arg.(
         value
         & opt(some(path), None)
-        & info(["P", "prefix-path"], ~env, ~docv="PATH", ~doc)
+        & info(["prefix-path", "P"], ~env, ~docs, ~docv="PATH", ~doc)
       );
     };
     let sandboxPath = {
@@ -148,7 +148,7 @@ let () = {
       Arg.(
         value
         & opt(some(path), None)
-        & info(["S", "sandbox-path"], ~env, ~docv="PATH", ~doc)
+        & info(["sandbox-path", "S"], ~env, ~docs, ~docv="PATH", ~doc)
       );
     };
     let buildPath = {
@@ -157,16 +157,11 @@ let () = {
       Arg.(
         value
         & opt(some(path), None)
-        & info(["B", "build"], ~env, ~docv="PATH", ~doc)
+        & info(["build", "B"], ~env, ~docs, ~docv="PATH", ~doc)
       );
     };
     Term.(
-      const(commonOptions)
-      $ debug
-      $ verb
-      $ prefixPath
-      $ sandboxPath
-      $ buildPath
+      const(commonOpts) $ debug $ verb $ prefixPath $ sandboxPath $ buildPath
     );
   };
   /* Command terms */
@@ -177,7 +172,7 @@ let () = {
     let man = help_secs;
     let cmd = opts => runToCompletion(build(opts));
     (
-      Term.(ret(const(cmd) $ copts_t)),
+      Term.(ret(const(cmd) $ commonOptsT)),
       Term.info("esyb", ~version="v0.1.0", ~doc, ~sdocs, ~exits, ~man)
     );
   };
@@ -186,9 +181,13 @@ let () = {
     let sdocs = Manpage.s_common_options;
     let exits = Term.default_exits;
     let man = help_secs;
-    let cmd = opts => runToCompletion(build(opts));
+    let cmd = (opts, buildOnly) => runToCompletion(build(~buildOnly, opts));
+    let buildOnlyT = {
+      let doc = "Only run build commands (skipping install commands).";
+      Arg.(value & flag & info(["build-only"], ~doc));
+    };
     (
-      Term.(ret(const(cmd) $ copts_t)),
+      Term.(ret(const(cmd) $ commonOptsT $ buildOnlyT)),
       Term.info("build", ~doc, ~sdocs, ~exits, ~man)
     );
   };
@@ -199,7 +198,7 @@ let () = {
     let man = help_secs;
     let cmd = opts => runToCompletion(shell(opts));
     (
-      Term.(ret(const(cmd) $ copts_t)),
+      Term.(ret(const(cmd) $ commonOptsT)),
       Term.info("shell", ~doc, ~sdocs, ~exits, ~man)
     );
   };
@@ -212,7 +211,7 @@ let () = {
       Arg.(non_empty & pos_all(string, []) & info([], ~docv="COMMAND"));
     let cmd = (opts, command) => runToCompletion(exec(opts, command));
     (
-      Term.(ret(const(cmd) $ copts_t $ command_t)),
+      Term.(ret(const(cmd) $ commonOptsT $ command_t)),
       Term.info("exec", ~doc, ~sdocs, ~exits, ~man)
     );
   };
@@ -229,7 +228,13 @@ let () = {
     ];
     (
       Term.(
-        ret(const(help) $ copts_t $ Arg.man_format $ Term.choice_names $ topic)
+        ret(
+          const(help)
+          $ commonOptsT
+          $ Arg.man_format
+          $ Term.choice_names
+          $ topic
+        )
       ),
       Term.info("help", ~doc, ~exits=Term.default_exits, ~man)
     );

@@ -27,7 +27,7 @@ let relocateSourceDir = (config: Config.t, spec: BuildSpec.t) => {
   Bos.OS.Cmd.run(cmd);
 };
 
-let relocateInstallDir = (config: Config.t, spec: BuildSpec.t) => {
+let commitBuildToStore = (config: Config.t, spec: BuildSpec.t) => {
   open Run;
   let rewritePrefixInFile = (~origPrefix, ~destPrefix, path) => {
     let cmd =
@@ -81,7 +81,7 @@ let doNothing = (_config: Config.t, _spec: BuildSpec.t) => Run.ok;
 /**
  * Execute `run` within the build environment for `spec`.
  */
-let withBuildEnv = (config: Config.t, spec: BuildSpec.t, run) => {
+let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, run) => {
   open Run;
   let {BuildSpec.sourceDir, installDir, buildDir, stageDir, _} = spec;
   let (rootDir, prepareRootDir, completeRootDir) =
@@ -161,7 +161,12 @@ let withBuildEnv = (config: Config.t, spec: BuildSpec.t, run) => {
   let finalize = result =>
     switch result {
     | Ok () =>
-      let%bind () = relocateInstallDir(config, spec);
+      let%bind () =
+        if (commit) {
+          commitBuildToStore(config, spec);
+        } else {
+          ok;
+        };
       let%bind () = completeRootDir(config, spec);
       ok;
     | error =>
@@ -176,13 +181,18 @@ let withBuildEnv = (config: Config.t, spec: BuildSpec.t, run) => {
   result;
 };
 
-let build = (config, spec) => {
+let build = (~buildOnly=true, config, spec) => {
   open Run;
   let runBuildAndInstall = (run, ()) => {
     let {BuildSpec.build, install} = spec;
     let%bind () = run(build);
-    let%bind () = run(install);
+    let%bind () =
+      if (! buildOnly) {
+        run(install);
+      } else {
+        ok;
+      };
     ok;
   };
-  withBuildEnv(config, spec, runBuildAndInstall);
+  withBuildEnv(~commit=! buildOnly, config, spec, runBuildAndInstall);
 };

@@ -16,16 +16,22 @@ type commonOptions = {
   sandboxPath: option(Fpath.t)
 };
 
-let build = (config, buildSpecPath) => {
+let build = (copts: commonOptions, buildSpecPath: option(Fpath.t)) => {
   open Run;
+  Logs.set_reporter(Logs_fmt.reporter());
+  let {prefixPath, sandboxPath} = copts;
+  let%bind config = Config.create(~prefixPath, ~sandboxPath, ());
   let buildSpecPath = Option.orDefault(v("build.json"), buildSpecPath);
   let%bind spec = BuildSpec.ofFile(config, buildSpecPath);
   let%bind () = Builder.build(config, spec);
   Ok();
 };
 
-let shell = (config: Config.t, buildSpecPath: option(Fpath.t)) => {
+let shell = (copts: commonOptions, buildSpecPath: option(Fpath.t)) => {
   open Run;
+  Logs.set_reporter(Logs_fmt.reporter());
+  let {prefixPath, sandboxPath} = copts;
+  let%bind config = Config.create(~prefixPath, ~sandboxPath, ());
   let runShell = (run, ()) => {
     let%bind rcFilename =
       putTempFile({|
@@ -46,22 +52,26 @@ let shell = (config: Config.t, buildSpecPath: option(Fpath.t)) => {
   ok;
 };
 
-let exec = (_copts, buildPath) => Ok();
-
-let runToCompletion =
-    (command, copts: commonOptions, buildPath: option(Fpath.t)) => {
+let exec = (copts, buildSpecPath, command) => {
+  open Run;
   Logs.set_reporter(Logs_fmt.reporter());
-  let run = {
-    open Run;
-    let {prefixPath, sandboxPath} = copts;
-    let%bind config = Config.create(~prefixPath, ~sandboxPath, ());
-    command(config, buildPath);
+  let {prefixPath, sandboxPath} = copts;
+  let%bind config = Config.create(~prefixPath, ~sandboxPath, ());
+  let runCommand = (run, ()) => {
+    let cmd = Bos.Cmd.of_list(command);
+    run([cmd]);
   };
+  let buildSpecPath = Option.orDefault(v("build.json"), buildSpecPath);
+  let%bind spec = BuildSpec.ofFile(config, buildSpecPath);
+  let%bind () = Builder.withBuildEnv(config, spec, runCommand);
+  ok;
+};
+
+let runToCompletion = run =>
   switch run {
   | Error(`Msg(msg)) => `Error((false, msg))
   | _ => `Ok()
   };
-};
 
 let help = (_copts, man_format, cmds, topic) =>
   switch topic {
@@ -142,9 +152,12 @@ let () = {
     Term.(const(commonOptions) $ debug $ verb $ prefixPath $ sandboxPath);
   };
   let buildPath_t = {
-    let doc = "path to build spec";
+    let doc = "Specifies path to build spec.";
+    let env = Arg.env_var("ESY__BUILD_SPEC", ~doc);
     Arg.(
-      value & pos(0, some(path), None) & info([], ~docv="BUILD_SPEC", ~doc)
+      value
+      & opt(some(path), None)
+      & info(["B", "build"], ~env, ~docv="PATH", ~doc)
     );
   };
   /* Command terms */
@@ -153,8 +166,10 @@ let () = {
     let sdocs = Manpage.s_common_options;
     let exits = Term.default_exits;
     let man = help_secs;
+    let cmd = (opts, buildSpecPath) =>
+      runToCompletion(build(opts, buildSpecPath));
     (
-      Term.(ret(const(runToCompletion(build)) $ copts_t $ buildPath_t)),
+      Term.(ret(const(cmd) $ copts_t $ buildPath_t)),
       Term.info("esyb", ~version="v0.1.0", ~doc, ~sdocs, ~exits, ~man)
     );
   };
@@ -163,8 +178,10 @@ let () = {
     let sdocs = Manpage.s_common_options;
     let exits = Term.default_exits;
     let man = help_secs;
+    let cmd = (opts, buildSpecPath) =>
+      runToCompletion(build(opts, buildSpecPath));
     (
-      Term.(ret(const(runToCompletion(build)) $ copts_t $ buildPath_t)),
+      Term.(ret(const(cmd) $ copts_t $ buildPath_t)),
       Term.info("build", ~doc, ~sdocs, ~exits, ~man)
     );
   };
@@ -173,8 +190,10 @@ let () = {
     let sdocs = Manpage.s_common_options;
     let exits = Term.default_exits;
     let man = help_secs;
+    let cmd = (opts, buildSpecPath) =>
+      runToCompletion(shell(opts, buildSpecPath));
     (
-      Term.(ret(const(runToCompletion(shell)) $ copts_t $ buildPath_t)),
+      Term.(ret(const(cmd) $ copts_t $ buildPath_t)),
       Term.info("shell", ~doc, ~sdocs, ~exits, ~man)
     );
   };
@@ -183,8 +202,12 @@ let () = {
     let sdocs = Manpage.s_common_options;
     let exits = Term.default_exits;
     let man = help_secs;
+    let command_t =
+      Arg.(non_empty & pos_all(string, []) & info([], ~docv="COMMAND"));
+    let cmd = (opts, buildSpecPath, command) =>
+      runToCompletion(exec(opts, buildSpecPath, command));
     (
-      Term.(ret(const(runToCompletion(exec)) $ copts_t $ buildPath_t)),
+      Term.(ret(const(cmd) $ copts_t $ buildPath_t $ command_t)),
       Term.info("exec", ~doc, ~sdocs, ~exits, ~man)
     );
   };

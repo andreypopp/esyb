@@ -68,7 +68,7 @@ module Env = {
         | _ => Error("expected a string value")
         };
       List.fold_left(add_to_map, Ok(Astring.String.Map.empty), items);
-    | _ => Error("expected object")
+    | _ => Error("expected an object")
     };
 };
 

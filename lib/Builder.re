@@ -1,42 +1,72 @@
-let rsync = (origDir, destDir) => {
-  let s = Fpath.to_string;
-  let cmd = [
-    "rsync",
-    "--quiet",
-    "--archive",
-    "--exclude",
-    s(destDir),
-    "--exclude",
-    "node_modules",
-    "--exclude",
-    "_build",
-    "--exclude",
-    "_release",
-    "--exclude",
-    "_esybuild",
-    "--exclude",
-    "_esyinstall",
-    /* The trailing "/" is important as it makes rsync to sync the contents of
-     * origDir rather than the origDir itself into destDir, see "man rsync" for
-     * details.
-     */
-    s(origDir) ++ "/",
-    s(destDir)
-  ];
-  let cmd = Bos.Cmd.of_list(cmd);
+let relocateSourceDir = (config: Config.t, spec: BuildSpec.t) => {
+  let cmd =
+    Bos.Cmd.(
+      empty
+      % config.rsyncCmd
+      % "--quiet"
+      % "--archive"
+      % "--exclude"
+      % p(spec.buildDir)
+      % "--exclude"
+      % "node_modules"
+      % "--exclude"
+      % "_build"
+      % "--exclude"
+      % "_release"
+      % "--exclude"
+      % "_esybuild"
+      % "--exclude"
+      % "_esyinstall"
+      /* The trailing "/" is important as it makes rsync to sync the contents of
+       * origDir rather than the origDir itself into destDir, see "man rsync" for
+       * details.
+       */
+      % (Fpath.to_string(spec.sourceDir) ++ "/")
+      % p(spec.buildDir)
+    );
   Bos.OS.Cmd.run(cmd);
 };
 
-let relocateSourceDir = (spec: BuildSpec.t) =>
-  rsync(spec.sourceDir, spec.buildDir);
+let relocateInstallDir = (config: Config.t, spec: BuildSpec.t) => {
+  open Run;
+  let rewritePrefixInFile = (~origPrefix, ~destPrefix, path) => {
+    let cmd =
+      Bos.Cmd.(
+        empty
+        % config.fastreplacestringCmd
+        % p(path)
+        % p(origPrefix)
+        % p(destPrefix)
+      );
+    Bos.OS.Cmd.run(cmd);
+  };
+  let rewriteTargetInSymlink = (~origPrefix, ~destPrefix, path) => Ok();
+  let relocate = (path: Fpath.t, stats: Unix.stats) =>
+    switch stats.st_kind {
+    | Unix.S_REG =>
+      rewritePrefixInFile(
+        ~origPrefix=spec.stageDir,
+        ~destPrefix=spec.installDir,
+        path
+      )
+    | Unix.S_LNK =>
+      rewriteTargetInSymlink(
+        ~origPrefix=spec.stageDir,
+        ~destPrefix=spec.installDir,
+        path
+      )
+    | _ => Ok()
+    };
+  let%bind () = traverse(spec.stageDir, relocate);
+  let%bind () = Bos.OS.Path.move(spec.stageDir, spec.installDir);
+  ok;
+};
 
-let relocateInstallDir = (_spec: BuildSpec.t) => Run.ok;
+let relocateBuildDir = (config: Config.t, _spec: BuildSpec.t) => Run.ok;
 
-let relocateBuildDir = (_spec: BuildSpec.t) => Run.ok;
+let relocateBuildDirCleanup = (config: Config.t, _spec: BuildSpec.t) => Run.ok;
 
-let relocateBuildDirCleanup = (_spec: BuildSpec.t) => Run.ok;
-
-let doNothing = (_spec: BuildSpec.t) => Run.ok;
+let doNothing = (_config: Config.t, _spec: BuildSpec.t) => Run.ok;
 
 /**
  * Execute `run` within the build environment for `spec`.
@@ -92,7 +122,7 @@ let withBuildEnv = (config: Config.t, spec: BuildSpec.t, run) => {
    * Prepare build/install.
    */
   let prepare = () => {
-    let%bind () = mkdir(installDir);
+    let%bind () = rmdir(installDir);
     let%bind () = mkdir(stageDir);
     let%bind () = mkdir(stageDir / "bin");
     let%bind () = mkdir(stageDir / "lib");
@@ -110,7 +140,7 @@ let withBuildEnv = (config: Config.t, spec: BuildSpec.t, run) => {
         let%bind () = mkdir(buildDir);
         ok;
       };
-    let%bind () = prepareRootDir(spec);
+    let%bind () = prepareRootDir(config, spec);
     let%bind () = mkdir(buildDir / "_esy");
     let%bind () = mkdir(buildDir / "_esy" / "log");
     ok;
@@ -121,10 +151,12 @@ let withBuildEnv = (config: Config.t, spec: BuildSpec.t, run) => {
   let finalize = result =>
     switch result {
     | Ok () =>
-      let%bind () = relocateInstallDir(spec);
-      let%bind () = completeRootDir(spec);
+      let%bind () = relocateInstallDir(config, spec);
+      let%bind () = completeRootDir(config, spec);
       ok;
-    | error => error
+    | error =>
+      let%bind () = completeRootDir(config, spec);
+      error;
     };
   let%bind store = Store.create(config.storePath);
   let%bind localStore = Store.create(config.localStorePath);

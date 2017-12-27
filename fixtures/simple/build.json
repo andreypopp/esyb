@@ -17,6 +17,11 @@
     [
       "echo",
       "install"
+    ],
+    [
+      "bash",
+      "-c",
+      "echo $cur__install/path > $cur__install/test"
     ]
   ],
   "sourceDir": "%sandbox%",
@@ -24,6 +29,7 @@
   "installDir": "%sandbox%/node_modules/.cache/esystore/i/name",
   "buildDir": "%sandbox%/node_modules/.cache/esystore/b/name",
   "env": {
-    "cur__name": "pkg"
+    "cur__name": "pkg",
+    "cur__install": "%sandbox%/node_modules/.cache/esystore/s/name"
   }
 }

@@ -96,11 +96,27 @@ let bindSpecToConfig = (config: Config.t, spec: t) => {
     | "store" => Some(Fpath.to_string(config.storePath))
     | "localStore" => Some(Fpath.to_string(config.localStorePath))
     | _ => None;
-  let%bind installDir = PathSyntax.render(env, spec.installDir);
-  let%bind stageDir = PathSyntax.render(env, spec.stageDir);
-  let%bind buildDir = PathSyntax.render(env, spec.buildDir);
-  let%bind sourceDir = PathSyntax.render(env, spec.sourceDir);
-  Ok({...spec, installDir, stageDir, buildDir, sourceDir});
+  let render = s => PathSyntax.render(env, s);
+  let renderPath = s => {
+    let s = Fpath.to_string(s);
+    let%bind s = PathSyntax.render(env, s);
+    Fpath.of_string(s);
+  };
+  let%bind installDir = renderPath(spec.installDir);
+  let%bind stageDir = renderPath(spec.stageDir);
+  let%bind buildDir = renderPath(spec.buildDir);
+  let%bind sourceDir = renderPath(spec.sourceDir);
+  let%bind env = {
+    let f = (k, v) =>
+      fun
+      | Ok(result) => {
+          let%bind v = render(v);
+          Ok(Astring.String.Map.add(k, v, result));
+        }
+      | error => error;
+    Astring.String.Map.fold(f, spec.env, Ok(Astring.String.Map.empty));
+  };
+  Ok({...spec, installDir, stageDir, buildDir, sourceDir, env});
 };
 
 let ofFile = (config: Config.t, path: Fpath.t) =>

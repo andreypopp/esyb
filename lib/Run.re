@@ -1,6 +1,8 @@
 /**
  * This module implements utilities which are used to "script" build processes.
  */
+type t('a) = result(unit, [> Rresult.R.msg] as 'a);
+
 let ok = Result.ok;
 
 let (/) = Fpath.(/);
@@ -36,4 +38,15 @@ let putTempFile = (contents: string) => {
   let%bind filename = Bos.OS.File.tmp("%s");
   let%bind () = Bos.OS.File.write(filename, contents);
   Ok(filename);
+};
+
+let traverse = (path: Fpath.t, f: (Fpath.t, Unix.stats) => t(_)) : t(_) => {
+  let visit = (path: Fpath.t) =>
+    fun
+    | Ok () => {
+        let%bind stats = Bos.OS.Path.symlink_stat(path);
+        f(path, stats);
+      }
+    | error => error;
+  Result.join(Bos.OS.Path.fold(~dotfiles=true, visit, Ok(), [path]));
 };

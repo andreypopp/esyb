@@ -11,6 +11,8 @@ let v = Fpath.v;
 
 let withCwd = (path, ~f) => Result.join(Bos.OS.Dir.with_current(path, f, ()));
 
+let exists = Bos.OS.Path.exists;
+
 let mkdir = path =>
   switch (Bos.OS.Dir.create(path)) {
   | Ok(_) => Ok()
@@ -24,6 +26,8 @@ let rm = path => Bos.OS.File.delete(path);
 let symlink = Bos.OS.Path.symlink;
 
 let symlink_target = Bos.OS.Path.symlink_target;
+
+let mv = Bos.OS.Path.move;
 
 let uname = () => {
   let ic = Unix.open_process_in("uname");

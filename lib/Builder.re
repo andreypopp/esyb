@@ -72,7 +72,50 @@ let commitBuildToStore = (config: Config.t, spec: BuildSpec.t) => {
   ok;
 };
 
-let relocateBuildDir = (config: Config.t, _spec: BuildSpec.t) => Run.ok;
+let relocateBuildDir = (config: Config.t, spec: BuildSpec.t) => {
+  open Run;
+  let savedBuild = spec.buildDir / "_build";
+  let currentBuild = spec.sourceDir / "_build";
+  let backupBuild = spec.sourceDir / "_build.prev";
+  let start = (_config, _spec) => {
+    let%bind () =
+      if%bind (exists(currentBuild)) {
+        mv(currentBuild, backupBuild);
+      } else {
+        ok;
+      };
+    let%bind () = mkdir(savedBuild);
+    let%bind () = mv(savedBuild, currentBuild);
+    ok;
+  };
+  let commit = (_config, _spec) => {
+    let%bind () =
+      if%bind (exists(currentBuild)) {
+        mv(currentBuild, savedBuild);
+      } else {
+        ok;
+      };
+    let%bind () =
+      if%bind (exists(backupBuild)) {
+        mv(backupBuild, currentBuild);
+      } else {
+        ok;
+      };
+    ok;
+  };
+  /*
+   # save _build
+   if [ -d "$esy_build__source_root/_build" ]; then
+     mv "$esy_build__source_root/_build" "$cur__target_dir/_build"
+   fi
+
+   # restore original _build
+   if [ -d "$cur__target_dir/_build.prev" ]; then
+     mv "$cur__target_dir/_build.prev" "$esy_build__source_root/_build"
+   fi
+   */
+  (start, commit);
+};
 
 let relocateBuildDirCleanup = (config: Config.t, _spec: BuildSpec.t) => Run.ok;
 
@@ -88,11 +131,9 @@ let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, run) => 
     switch (spec.buildType, spec.sourceType) {
     | (InSource, _) => (buildDir, relocateSourceDir, doNothing)
     | (JbuilderLike, Immutable) => (buildDir, relocateSourceDir, doNothing)
-    | (JbuilderLike, Transient) => (
-        sourceDir,
-        relocateBuildDir,
-        relocateBuildDirCleanup
-      )
+    | (JbuilderLike, Transient) =>
+      let (start, commit) = relocateBuildDir(config, spec);
+      (sourceDir, start, commit);
     | (JbuilderLike, Root) => (sourceDir, doNothing, doNothing)
     | (OutOfSource, _) => (sourceDir, doNothing, doNothing)
     };

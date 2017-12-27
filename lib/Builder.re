@@ -103,17 +103,6 @@ let relocateBuildDir = (config: Config.t, spec: BuildSpec.t) => {
       };
     ok;
   };
-  /*
-   # save _build
-   if [ -d "$esy_build__source_root/_build" ]; then
-     mv "$esy_build__source_root/_build" "$cur__target_dir/_build"
-   fi
-
-   # restore original _build
-   if [ -d "$cur__target_dir/_build.prev" ]; then
-     mv "$cur__target_dir/_build.prev" "$esy_build__source_root/_build"
-   fi
-   */
   (start, commit);
 };
 

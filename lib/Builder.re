@@ -27,18 +27,27 @@ let rsync = (origDir, destDir) => {
   Bos.OS.Cmd.run(cmd);
 };
 
+let relocateSourceDir = (spec: BuildSpec.t) =>
+  rsync(spec.sourceDir, spec.buildDir);
+
+let relocateInstallDir = (_spec: BuildSpec.t) => Run.ok;
+
+let relocateBuildDir = (_spec: BuildSpec.t) => Run.ok;
+
+let relocateBuildDirCleanup = (_spec: BuildSpec.t) => Run.ok;
+
+let doNothing = (_spec: BuildSpec.t) => Run.ok;
+
+/**
+ * Execute `run` within the build environment for `spec`.
+ */
 let withBuildEnv = (config: Config.t, spec: BuildSpec.t, run) => {
   open Run;
-  let relocateSources = () => rsync(spec.sourceDir, spec.buildDir);
-  let relocateBuildDir = () => ok;
-  let relocateBuildDirCleanup = () => ok;
-  let relocateInstallDir = () => ok;
-  let doNothing = () => ok;
   let {BuildSpec.sourceDir, installDir, buildDir, stageDir, _} = spec;
   let (rootDir, prepareRootDir, completeRootDir) =
     switch (spec.buildType, spec.sourceType) {
-    | (InSource, _) => (buildDir, relocateSources, doNothing)
-    | (JbuilderLike, Immutable) => (buildDir, relocateSources, doNothing)
+    | (InSource, _) => (buildDir, relocateSourceDir, doNothing)
+    | (JbuilderLike, Immutable) => (buildDir, relocateSourceDir, doNothing)
     | (JbuilderLike, Transient) => (
         sourceDir,
         relocateBuildDir,
@@ -85,14 +94,6 @@ let withBuildEnv = (config: Config.t, spec: BuildSpec.t, run) => {
   let prepare = () => {
     let%bind () = mkdir(installDir);
     let%bind () = mkdir(stageDir);
-    let%bind () =
-      if (spec.sourceType == Immutable || spec.buildType == InSource) {
-        rmdir(buildDir);
-      } else {
-        ok;
-      };
-    let%bind () = mkdir(buildDir);
-    let%bind () = mkdir(stageDir);
     let%bind () = mkdir(stageDir / "bin");
     let%bind () = mkdir(stageDir / "lib");
     let%bind () = mkdir(stageDir / "etc");
@@ -100,7 +101,16 @@ let withBuildEnv = (config: Config.t, spec: BuildSpec.t, run) => {
     let%bind () = mkdir(stageDir / "man");
     let%bind () = mkdir(stageDir / "share");
     let%bind () = mkdir(stageDir / "doc");
-    let%bind () = prepareRootDir();
+    let%bind () =
+      if (spec.sourceType == Immutable || spec.buildType == InSource) {
+        let%bind () = rmdir(buildDir);
+        let%bind () = mkdir(buildDir);
+        ok;
+      } else {
+        let%bind () = mkdir(buildDir);
+        ok;
+      };
+    let%bind () = prepareRootDir(spec);
     let%bind () = mkdir(buildDir / "_esy");
     let%bind () = mkdir(buildDir / "_esy" / "log");
     ok;
@@ -111,8 +121,8 @@ let withBuildEnv = (config: Config.t, spec: BuildSpec.t, run) => {
   let finalize = result =>
     switch result {
     | Ok () =>
-      let%bind () = relocateInstallDir();
-      let%bind () = completeRootDir();
+      let%bind () = relocateInstallDir(spec);
+      let%bind () = completeRootDir(spec);
       ok;
     | error => error
     };

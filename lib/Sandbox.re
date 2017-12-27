@@ -59,7 +59,7 @@ module NoSandbox = {
   };
 };
 
-let sandboxExec = (~env=Astring.String.Map.empty, config) =>
+let sandboxExec = config =>
   switch (Run.uname()) {
   | "darwin" => Darwin.sandboxExec(config)
   | _ => NoSandbox.sandboxExec(config)

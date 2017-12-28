@@ -20,7 +20,7 @@ type commonOpts = {
 let build = (~buildOnly=false, copts: commonOpts) => {
   open Run;
   Logs.set_reporter(Logs_fmt.reporter());
-  let {prefixPath, sandboxPath, buildPath} = copts;
+  let {prefixPath, sandboxPath, buildPath, _} = copts;
   let buildPath = Option.orDefault(v("build.json"), buildPath);
   let%bind config = Config.create(~prefixPath, ~sandboxPath, ());
   let%bind spec = BuildSpec.ofFile(config, buildPath);
@@ -31,7 +31,7 @@ let build = (~buildOnly=false, copts: commonOpts) => {
 let shell = (copts: commonOpts) => {
   open Run;
   Logs.set_reporter(Logs_fmt.reporter());
-  let {prefixPath, sandboxPath, buildPath} = copts;
+  let {prefixPath, sandboxPath, buildPath, _} = copts;
   let buildPath = Option.orDefault(v("build.json"), buildPath);
   let%bind config = Config.create(~prefixPath, ~sandboxPath, ());
   let runShell = (run, ()) => {
@@ -56,7 +56,7 @@ let shell = (copts: commonOpts) => {
 let exec = (copts, command) => {
   open Run;
   Logs.set_reporter(Logs_fmt.reporter());
-  let {prefixPath, sandboxPath, buildPath} = copts;
+  let {prefixPath, sandboxPath, buildPath, _} = copts;
   let buildPath = Option.orDefault(v("build.json"), buildPath);
   let%bind config = Config.create(~prefixPath, ~sandboxPath, ());
   let runCommand = (run, ()) => {
@@ -86,7 +86,7 @@ let help = (_copts, man_format, cmds, topic) =>
       List.iter(print_endline, topics);
       `Ok();
     | `Ok(t) when List.mem(t, cmds) => `Help((man_format, Some(t)))
-    | `Ok(t) =>
+    | `Ok(_) =>
       let page = ((topic, 7, "", "", ""), [`S(topic), `P("Say something")]);
       `Ok(Cmdliner.Manpage.print(man_format, Format.std_formatter, page));
     };

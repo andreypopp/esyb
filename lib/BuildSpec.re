@@ -81,10 +81,10 @@ type t = {
   buildType,
   build: list(Cmd.t),
   install: list(Cmd.t),
-  sourceDir: Fpath.t,
-  stageDir: Fpath.t,
-  installDir: Fpath.t,
-  buildDir: Fpath.t,
+  sourcePath: Fpath.t,
+  stagePath: Fpath.t,
+  installPath: Fpath.t,
+  buildPath: Fpath.t,
   env: Env.t
 };
 
@@ -118,19 +118,19 @@ let renderBuild = (config: Config.t, spec: t) => {
     Astring.String.Map.fold(f, env, Ok(Astring.String.Map.empty));
   };
   let renderCommands = commands => Result.listMap(renderCommand, commands);
-  let%bind installDir = renderPath(spec.installDir);
-  let%bind stageDir = renderPath(spec.stageDir);
-  let%bind buildDir = renderPath(spec.buildDir);
-  let%bind sourceDir = renderPath(spec.sourceDir);
+  let%bind installPath = renderPath(spec.installPath);
+  let%bind stagePath = renderPath(spec.stagePath);
+  let%bind buildPath = renderPath(spec.buildPath);
+  let%bind sourcePath = renderPath(spec.sourcePath);
   let%bind env = renderEnv(spec.env);
   let%bind install = renderCommands(spec.install);
   let%bind build = renderCommands(spec.build);
   Ok({
     ...spec,
-    installDir,
-    stageDir,
-    buildDir,
-    sourceDir,
+    installPath,
+    stagePath,
+    buildPath,
+    sourcePath,
     env,
     install,
     build

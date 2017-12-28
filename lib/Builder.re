@@ -1,4 +1,4 @@
-let relocateSourceDir = (config: Config.t, spec: BuildSpec.t) => {
+let relocateSourcePath = (config: Config.t, spec: BuildSpec.t) => {
   let cmd =
     Bos.Cmd.(
       empty
@@ -6,7 +6,7 @@ let relocateSourceDir = (config: Config.t, spec: BuildSpec.t) => {
       % "--quiet"
       % "--archive"
       % "--exclude"
-      % p(spec.buildDir)
+      % p(spec.buildPath)
       % "--exclude"
       % "node_modules"
       % "--exclude"
@@ -18,11 +18,11 @@ let relocateSourceDir = (config: Config.t, spec: BuildSpec.t) => {
       % "--exclude"
       % "_esyinstall"
       /* The trailing "/" is important as it makes rsync to sync the contents of
-       * origDir rather than the origDir itself into destDir, see "man rsync" for
+       * origPath rather than the origPath itself into destPath, see "man rsync" for
        * details.
        */
-      % (Fpath.to_string(spec.sourceDir) ++ "/")
-      % p(spec.buildDir)
+      % (Fpath.to_string(spec.sourcePath) ++ "/")
+      % p(spec.buildPath)
     );
   Bos.OS.Cmd.run(cmd);
 };
@@ -55,28 +55,28 @@ let commitBuildToStore = (config: Config.t, spec: BuildSpec.t) => {
     switch stats.st_kind {
     | Unix.S_REG =>
       rewritePrefixInFile(
-        ~origPrefix=spec.stageDir,
-        ~destPrefix=spec.installDir,
+        ~origPrefix=spec.stagePath,
+        ~destPrefix=spec.installPath,
         path
       )
     | Unix.S_LNK =>
       rewriteTargetInSymlink(
-        ~origPrefix=spec.stageDir,
-        ~destPrefix=spec.installDir,
+        ~origPrefix=spec.stagePath,
+        ~destPrefix=spec.installPath,
         path
       )
     | _ => Ok()
     };
-  let%bind () = traverse(spec.stageDir, relocate);
-  let%bind () = Bos.OS.Path.move(spec.stageDir, spec.installDir);
+  let%bind () = traverse(spec.stagePath, relocate);
+  let%bind () = Bos.OS.Path.move(spec.stagePath, spec.installPath);
   ok;
 };
 
-let relocateBuildDir = (_config: Config.t, spec: BuildSpec.t) => {
+let relocateBuildPath = (_config: Config.t, spec: BuildSpec.t) => {
   open Run;
-  let savedBuild = spec.buildDir / "_build";
-  let currentBuild = spec.sourceDir / "_build";
-  let backupBuild = spec.sourceDir / "_build.prev";
+  let savedBuild = spec.buildPath / "_build";
+  let currentBuild = spec.sourcePath / "_build";
+  let backupBuild = spec.sourcePath / "_build.prev";
   let start = (_config, _spec) => {
     let%bind () =
       if%bind (exists(currentBuild)) {
@@ -113,16 +113,16 @@ let doNothing = (_config: Config.t, _spec: BuildSpec.t) => Run.ok;
  */
 let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, run) => {
   open Run;
-  let {BuildSpec.sourceDir, installDir, buildDir, stageDir, _} = spec;
-  let (rootDir, prepareRootDir, completeRootDir) =
+  let {BuildSpec.sourcePath, installPath, buildPath, stagePath, _} = spec;
+  let (rootPath, prepareRootPath, completeRootPath) =
     switch (spec.buildType, spec.sourceType) {
-    | (InSource, _) => (buildDir, relocateSourceDir, doNothing)
-    | (JbuilderLike, Immutable) => (buildDir, relocateSourceDir, doNothing)
+    | (InSource, _) => (buildPath, relocateSourcePath, doNothing)
+    | (JbuilderLike, Immutable) => (buildPath, relocateSourcePath, doNothing)
     | (JbuilderLike, Transient) =>
-      let (start, commit) = relocateBuildDir(config, spec);
-      (sourceDir, start, commit);
-    | (JbuilderLike, Root) => (sourceDir, doNothing, doNothing)
-    | (OutOfSource, _) => (sourceDir, doNothing, doNothing)
+      let (start, commit) = relocateBuildPath(config, spec);
+      (sourcePath, start, commit);
+    | (JbuilderLike, Root) => (sourcePath, doNothing, doNothing)
+    | (OutOfSource, _) => (sourcePath, doNothing, doNothing)
     };
   let%bind sandboxConfig = {
     open Sandbox;
@@ -131,33 +131,33 @@ let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, run) => 
         String.concat(Fpath.dir_sep, [Fpath.to_string(base), ...segments]);
       Regex(pat);
     };
-    let%bind tempDir = {
+    let%bind tempPath = {
       let v = Fpath.v(Bos.OS.Env.opt_var("TMPDIR", ~absent="/tmp"));
       let%bind v = realpath(v);
       Ok(Fpath.to_string(v));
     };
-    let allowWriteToSourceDir =
+    let allowWriteToSourcePath =
       switch spec.buildType {
       | JbuilderLike => [
-          Subpath(Fpath.to_string(sourceDir / "_build")),
-          regex(sourceDir, [".*", "[^/]*\\.install"]),
-          regex(sourceDir, ["[^/]*\\.install"]),
-          regex(sourceDir, [".*", "[^/]*\\.opam"]),
-          regex(sourceDir, ["[^/]*\\.opam"]),
-          regex(sourceDir, [".*", "jbuild-ignore"])
+          Subpath(Fpath.to_string(sourcePath / "_build")),
+          regex(sourcePath, [".*", "[^/]*\\.install"]),
+          regex(sourcePath, ["[^/]*\\.install"]),
+          regex(sourcePath, [".*", "[^/]*\\.opam"]),
+          regex(sourcePath, ["[^/]*\\.opam"]),
+          regex(sourcePath, [".*", "jbuild-ignore"])
         ]
       | _ => []
       };
     Ok(
-      allowWriteToSourceDir
+      allowWriteToSourcePath
       @ [
-        regex(sourceDir, [".*", "\\.merlin"]),
-        regex(sourceDir, ["\\.merlin"]),
-        Subpath(Fpath.to_string(buildDir)),
-        Subpath(Fpath.to_string(stageDir)),
+        regex(sourcePath, [".*", "\\.merlin"]),
+        regex(sourcePath, ["\\.merlin"]),
+        Subpath(Fpath.to_string(buildPath)),
+        Subpath(Fpath.to_string(stagePath)),
         Subpath("/private/tmp"),
         Subpath("/tmp"),
-        Subpath(tempDir)
+        Subpath(tempPath)
       ]
     );
   };
@@ -175,28 +175,28 @@ let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, run) => 
    * Prepare build/install.
    */
   let prepare = () => {
-    let%bind () = rmdir(installDir);
-    let%bind () = mkdir(stageDir);
-    let%bind () = mkdir(stageDir / "bin");
-    let%bind () = mkdir(stageDir / "lib");
-    let%bind () = mkdir(stageDir / "etc");
-    let%bind () = mkdir(stageDir / "sbin");
-    let%bind () = mkdir(stageDir / "man");
-    let%bind () = mkdir(stageDir / "share");
-    let%bind () = mkdir(stageDir / "doc");
+    let%bind () = rmdir(installPath);
+    let%bind () = mkdir(stagePath);
+    let%bind () = mkdir(stagePath / "bin");
+    let%bind () = mkdir(stagePath / "lib");
+    let%bind () = mkdir(stagePath / "etc");
+    let%bind () = mkdir(stagePath / "sbin");
+    let%bind () = mkdir(stagePath / "man");
+    let%bind () = mkdir(stagePath / "share");
+    let%bind () = mkdir(stagePath / "doc");
     let%bind () =
       switch (spec.sourceType, spec.buildType) {
       | (Immutable, _)
       | (_, InSource) =>
-        let%bind () = rmdir(buildDir);
-        let%bind () = mkdir(buildDir);
+        let%bind () = rmdir(buildPath);
+        let%bind () = mkdir(buildPath);
         ok;
       | _ =>
-        let%bind () = mkdir(buildDir);
+        let%bind () = mkdir(buildPath);
         ok;
       };
-    let%bind () = prepareRootDir(config, spec);
-    let%bind () = mkdir(buildDir / "_esy");
+    let%bind () = prepareRootPath(config, spec);
+    let%bind () = mkdir(buildPath / "_esy");
     ok;
   };
   /*
@@ -211,16 +211,16 @@ let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, run) => 
         } else {
           ok;
         };
-      let%bind () = completeRootDir(config, spec);
+      let%bind () = completeRootPath(config, spec);
       ok;
     | error =>
-      let%bind () = completeRootDir(config, spec);
+      let%bind () = completeRootPath(config, spec);
       error;
     };
   let%bind _store = Store.create(config.storePath);
   let%bind _localStore = Store.create(config.localStorePath);
   let%bind () = prepare();
-  let result = withCwd(rootDir, ~f=run(runCommands));
+  let result = withCwd(rootPath, ~f=run(runCommands));
   let%bind () = finalize(result);
   result;
 };

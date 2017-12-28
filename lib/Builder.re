@@ -161,12 +161,17 @@ let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, run) => 
       ]
     );
   };
+  let env =
+    switch (Bos.OS.Env.var("TERM")) {
+    | Some(term) => Astring.String.Map.add("TERM", term, spec.env)
+    | None => spec.env
+    };
   let%bind commandExec = Sandbox.sandboxExec({allowWrite: sandboxConfig});
   let rec runCommands = commands =>
     switch commands {
     | [] => Ok()
     | [cmd, ...cmds] =>
-      switch (commandExec(~env=spec.env, cmd)) {
+      switch (commandExec(~env, cmd)) {
       | Ok(_) => runCommands(cmds)
       | Error(err) => Error(err)
       }

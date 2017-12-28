@@ -195,7 +195,6 @@ let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, run) => 
       };
     let%bind () = prepareRootDir(config, spec);
     let%bind () = mkdir(buildDir / "_esy");
-    let%bind () = mkdir(buildDir / "_esy" / "log");
     ok;
   };
   /*

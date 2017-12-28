@@ -55,6 +55,9 @@ This is needed to allow build descriptions not to be tied to a concrete host.
 
 ## Development
 
+Right now it requires `fastreplacestring.exe` and `rsync` to be available on
+`$PATH`.
+
 ```
 % npm install -g esy
 % esy install

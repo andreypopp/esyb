@@ -185,11 +185,13 @@ let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, run) => 
     let%bind () = mkdir(stageDir / "share");
     let%bind () = mkdir(stageDir / "doc");
     let%bind () =
-      if (spec.sourceType == Immutable || spec.buildType == InSource) {
+      switch (spec.sourceType, spec.buildType) {
+      | (Immutable, _)
+      | (_, InSource) =>
         let%bind () = rmdir(buildDir);
         let%bind () = mkdir(buildDir);
         ok;
-      } else {
+      | _ =>
         let%bind () = mkdir(buildDir);
         ok;
       };

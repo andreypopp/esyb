@@ -1,6 +1,6 @@
 type pattern =
-  | Subpath(Fpath.t)
-  | Regex(Fpath.t);
+  | Subpath(string)
+  | Regex(string);
 
 type config = {allowWrite: list(pattern)};
 
@@ -12,17 +12,8 @@ module Darwin = {
       List.map(
         fun
         | Subpath(p) =>
-          v([
-            I("allow"),
-            I("file-write*"),
-            L([I("subpath"), S(Fpath.to_string(p))])
-          ])
-        | Regex(p) =>
-          v([
-            I("allow"),
-            I("file-write*"),
-            L([I("regex"), S(Fpath.to_string(p))])
-          ])
+          v([I("allow"), I("file-write*"), L([I("subpath"), S(p)])])
+        | Regex(p) => v([I("allow"), I("file-write*"), L([I("regex"), S(p)])])
       );
     let doc =
       [

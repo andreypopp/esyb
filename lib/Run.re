@@ -27,6 +27,8 @@ let symlink = Bos.OS.Path.symlink;
 
 let symlink_target = Bos.OS.Path.symlink_target;
 
+let symlinkTarget = Bos.OS.Path.symlink_target;
+
 let mv = Bos.OS.Path.move;
 
 let uname = () => {
@@ -37,6 +39,27 @@ let uname = () => {
 };
 
 module Let_syntax = Result.Let_syntax;
+
+let rec realpath = (p: Fpath.t) => {
+  let isSymlinkAndExists = p =>
+    switch (Bos.OS.Path.symlink_stat(p)) {
+    | Ok({Unix.st_kind: Unix.S_LNK, _}) => Ok(true)
+    | _ => Ok(false)
+    };
+  if (Fpath.is_root(p)) {
+    Ok(p);
+  } else {
+    let%bind isSymlink = isSymlinkAndExists(p);
+    if (isSymlink) {
+      let%bind target = symlinkTarget(p);
+      realpath(target |> Fpath.append(Fpath.parent(p)) |> Fpath.normalize);
+    } else {
+      let parent = p |> Fpath.parent |> Fpath.rem_empty_seg;
+      let%bind parent = realpath(parent);
+      Ok(parent / Fpath.basename(p));
+    };
+  };
+};
 
 /**
  * Put temporary file into filesystem with the specified contents and return its

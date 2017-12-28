@@ -72,7 +72,7 @@ let commitBuildToStore = (config: Config.t, spec: BuildSpec.t) => {
   ok;
 };
 
-let relocateBuildDir = (config: Config.t, spec: BuildSpec.t) => {
+let relocateBuildDir = (_config: Config.t, spec: BuildSpec.t) => {
   open Run;
   let savedBuild = spec.buildDir / "_build";
   let currentBuild = spec.sourceDir / "_build";
@@ -106,8 +106,6 @@ let relocateBuildDir = (config: Config.t, spec: BuildSpec.t) => {
   (start, commit);
 };
 
-let relocateBuildDirCleanup = (config: Config.t, _spec: BuildSpec.t) => Run.ok;
-
 let doNothing = (_config: Config.t, _spec: BuildSpec.t) => Run.ok;
 
 /**
@@ -126,27 +124,42 @@ let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, run) => 
     | (JbuilderLike, Root) => (sourceDir, doNothing, doNothing)
     | (OutOfSource, _) => (sourceDir, doNothing, doNothing)
     };
-  let sandboxConfig = {
+  let%bind sandboxConfig = {
     open Sandbox;
+    let regex = (base, segments) => {
+      let pat =
+        String.concat(Fpath.dir_sep, [Fpath.to_string(base), ...segments]);
+      Regex(pat);
+    };
+    let%bind tempDir = {
+      let v = Fpath.v(Bos.OS.Env.opt_var("TMPDIR", ~absent="/tmp"));
+      let%bind v = realpath(v);
+      Ok(Fpath.to_string(v));
+    };
     let allowWriteToSourceDir =
       switch spec.buildType {
       | JbuilderLike => [
-          Subpath(sourceDir / "_build"),
-          Regex(sourceDir / ".*" / "[^/]*\\.install"),
-          Regex(sourceDir / "[^/]*\\.install"),
-          Regex(sourceDir / ".*" / "[^/]*\\.opam"),
-          Regex(sourceDir / "[^/]*\\.opam"),
-          Regex(sourceDir / ".*" / "jbuild-ignore")
+          Subpath(Fpath.to_string(sourceDir / "_build")),
+          regex(sourceDir, [".*", "[^/]*\\.install"]),
+          regex(sourceDir, ["[^/]*\\.install"]),
+          regex(sourceDir, [".*", "[^/]*\\.opam"]),
+          regex(sourceDir, ["[^/]*\\.opam"]),
+          regex(sourceDir, [".*", "jbuild-ignore"])
         ]
       | _ => []
       };
-    allowWriteToSourceDir
-    @ [
-      Regex(sourceDir / ".*" / "\\.merlin"),
-      Regex(sourceDir / "\\.merlin"),
-      Subpath(buildDir),
-      Subpath(stageDir)
-    ];
+    Ok(
+      allowWriteToSourceDir
+      @ [
+        regex(sourceDir, [".*", "\\.merlin"]),
+        regex(sourceDir, ["\\.merlin"]),
+        Subpath(Fpath.to_string(buildDir)),
+        Subpath(Fpath.to_string(stageDir)),
+        Subpath("/private/tmp"),
+        Subpath("/tmp"),
+        Subpath(tempDir)
+      ]
+    );
   };
   let%bind commandExec = Sandbox.sandboxExec({allowWrite: sandboxConfig});
   let rec runCommands = commands =>
@@ -203,10 +216,10 @@ let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, run) => 
       let%bind () = completeRootDir(config, spec);
       error;
     };
-  let%bind store = Store.create(config.storePath);
-  let%bind localStore = Store.create(config.localStorePath);
+  let%bind _store = Store.create(config.storePath);
+  let%bind _localStore = Store.create(config.localStorePath);
   let%bind () = prepare();
-  let result = withCwd(rootDir, run(runCommands));
+  let result = withCwd(rootDir, ~f=run(runCommands));
   let%bind () = finalize(result);
   result;
 };
@@ -214,7 +227,7 @@ let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, run) => 
 let build = (~buildOnly=true, config, spec) => {
   open Run;
   let runBuildAndInstall = (run, ()) => {
-    let {BuildSpec.build, install} = spec;
+    let {BuildSpec.build, install, _} = spec;
     let%bind () = run(build);
     let%bind () =
       if (! buildOnly) {

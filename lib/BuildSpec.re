@@ -88,25 +88,26 @@ type t = {
   env: Env.t
 };
 
-let bindSpecToConfig = (config: Config.t, spec: t) => {
+let renderBuild = (config: Config.t, spec: t) => {
   open Result;
-  let env =
+  let lookupVar =
     fun
     | "sandbox" => Some(Fpath.to_string(config.sandboxPath))
     | "store" => Some(Fpath.to_string(config.storePath))
     | "localStore" => Some(Fpath.to_string(config.localStorePath))
     | _ => None;
-  let render = s => PathSyntax.render(env, s);
+  let render = s => PathSyntax.render(lookupVar, s);
   let renderPath = s => {
     let s = Fpath.to_string(s);
-    let%bind s = PathSyntax.render(env, s);
+    let%bind s = PathSyntax.render(lookupVar, s);
     Fpath.of_string(s);
   };
-  let%bind installDir = renderPath(spec.installDir);
-  let%bind stageDir = renderPath(spec.stageDir);
-  let%bind buildDir = renderPath(spec.buildDir);
-  let%bind sourceDir = renderPath(spec.sourceDir);
-  let%bind env = {
+  let renderCommand = s =>
+    s
+    |> Bos.Cmd.to_list
+    |> Result.listMap(render)
+    |> Result.map(Bos.Cmd.of_list);
+  let renderEnv = env => {
     let f = (k, v) =>
       fun
       | Ok(result) => {
@@ -114,9 +115,26 @@ let bindSpecToConfig = (config: Config.t, spec: t) => {
           Ok(Astring.String.Map.add(k, v, result));
         }
       | error => error;
-    Astring.String.Map.fold(f, spec.env, Ok(Astring.String.Map.empty));
+    Astring.String.Map.fold(f, env, Ok(Astring.String.Map.empty));
   };
-  Ok({...spec, installDir, stageDir, buildDir, sourceDir, env});
+  let renderCommands = commands => Result.listMap(renderCommand, commands);
+  let%bind installDir = renderPath(spec.installDir);
+  let%bind stageDir = renderPath(spec.stageDir);
+  let%bind buildDir = renderPath(spec.buildDir);
+  let%bind sourceDir = renderPath(spec.sourceDir);
+  let%bind env = renderEnv(spec.env);
+  let%bind install = renderCommands(spec.install);
+  let%bind build = renderCommands(spec.build);
+  Ok({
+    ...spec,
+    installDir,
+    stageDir,
+    buildDir,
+    sourceDir,
+    env,
+    install,
+    build
+  });
 };
 
 let ofFile = (config: Config.t, path: Fpath.t) =>
@@ -124,7 +142,7 @@ let ofFile = (config: Config.t, path: Fpath.t) =>
     {
       let%bind data = Bos.OS.File.read(path);
       let%bind spec = Json.parseWith(of_yojson, data);
-      let%bind spec = bindSpecToConfig(config, spec);
+      let%bind spec = renderBuild(config, spec);
       Ok(spec);
     }
   );

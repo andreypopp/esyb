@@ -9,11 +9,29 @@ let join = rr =>
   | Error(msg) => Error(msg)
   };
 
+let map = f =>
+  fun
+  | Ok(v) => Ok(f(v))
+  | Error(err) => Error(err);
+
 let (>>) = (a, b) =>
   switch a {
   | Ok () => b()
   | Error(msg) => Error(msg)
   };
+
+let listMap = (f, xs) => {
+  let f = (prev, x) =>
+    switch prev {
+    | Ok(xs) =>
+      switch (f(x)) {
+      | Ok(x) => Ok([x, ...xs])
+      | Error(err) => Error(err)
+      }
+    | error => error
+    };
+  xs |> List.fold_left(f, Ok([])) |> map(List.rev);
+};
 
 module Let_syntax = {
   let bind = (~f, v) =>

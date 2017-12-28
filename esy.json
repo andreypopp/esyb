@@ -5,7 +5,7 @@
   "license": "MIT",
   "esy": {
     "build": [
-      "jbuilder build"
+      "jbuilder build --dev"
     ],
     "install": [
       "esy-installer"

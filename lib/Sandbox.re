@@ -4,7 +4,16 @@ type pattern =
 
 type config = {allowWrite: list(pattern)};
 
-module Darwin = {
+module type Sandbox = {
+  let sandboxExec:
+    config =>
+    result(
+      (~env: Bos.OS.Env.t, Bos.Cmd.t) => result(unit, [> Result.R.msg]),
+      [> Rresult.R.msg] as 'a
+    );
+};
+
+module Darwin: Sandbox = {
   let renderConfig = config => {
     open Sexp;
     let v = x => Value(L(x));
@@ -43,7 +52,7 @@ module Darwin = {
   };
 };
 
-module NoSandbox = {
+module NoSandbox: Sandbox = {
   let sandboxExec = _config => {
     let exec = (~env, command) => Bos.OS.Cmd.run(~env, command);
     Ok(exec);

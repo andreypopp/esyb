@@ -1,6 +1,9 @@
 lib: [
   "_build/install/default/lib/EsyLib/META" {"META"}
   "_build/install/default/lib/EsyLib/opam" {"opam"}
+  "_build/install/default/lib/EsyLib/EsyLib__BuildInfo.cmi"
+  "_build/install/default/lib/EsyLib/EsyLib__BuildInfo.cmt"
+  "_build/install/default/lib/EsyLib/BuildInfo.re"
   "_build/install/default/lib/EsyLib/EsyLib__BuildSpec.cmi"
   "_build/install/default/lib/EsyLib/EsyLib__BuildSpec.cmt"
   "_build/install/default/lib/EsyLib/BuildSpec.re"

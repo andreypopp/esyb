@@ -17,14 +17,14 @@ type commonOpts = {
   sandboxPath: option(Fpath.t)
 };
 
-let build = (~buildOnly=false, copts: commonOpts) => {
+let build = (~buildOnly=false, ~force=false, copts: commonOpts) => {
   open Run;
   Logs.set_reporter(Logs_fmt.reporter());
   let {prefixPath, sandboxPath, buildPath, _} = copts;
   let buildPath = Option.orDefault(v("build.json"), buildPath);
   let%bind config = Config.create(~prefixPath, ~sandboxPath, ());
   let%bind spec = BuildSpec.ofFile(config, buildPath);
-  let%bind () = Builder.build(~buildOnly, config, spec);
+  let%bind () = Builder.build(~buildOnly, ~force, config, spec);
   Ok();
 };
 
@@ -181,13 +181,18 @@ let () = {
     let sdocs = Manpage.s_common_options;
     let exits = Term.default_exits;
     let man = help_secs;
-    let cmd = (opts, buildOnly) => runToCompletion(build(~buildOnly, opts));
+    let cmd = (opts, buildOnly, force) =>
+      runToCompletion(build(~buildOnly, ~force, opts));
+    let forceT = {
+      let doc = "Force build without running any staleness checks.";
+      Arg.(value & flag & info(["f", "force"], ~doc));
+    };
     let buildOnlyT = {
       let doc = "Only run build commands (skipping install commands).";
       Arg.(value & flag & info(["build-only"], ~doc));
     };
     (
-      Term.(ret(const(cmd) $ commonOptsT $ buildOnlyT)),
+      Term.(ret(const(cmd) $ commonOptsT $ buildOnlyT $ forceT)),
       Term.info("build", ~doc, ~sdocs, ~exits, ~man)
     );
   };

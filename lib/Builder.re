@@ -106,6 +106,39 @@ let relocateBuildPath = (_config: Config.t, spec: BuildSpec.t) => {
   (start, commit);
 };
 
+let findSourceModTime = (spec: BuildSpec.t) => {
+  open Run;
+  let visit = (path: Fpath.t) =>
+    fun
+    | Ok(maxTime) => {
+        let%bind {Unix.st_mtime: time, _} = Bos.OS.Path.symlink_stat(path);
+        Ok(time > maxTime ? time : maxTime);
+      }
+    | error => error;
+  let traverse =
+    `Sat(
+      path =>
+        switch (Fpath.basename(path)) {
+        | "node_modules" => Ok(false)
+        | "_esy" => Ok(false)
+        | "_release" => Ok(false)
+        | "_build" => Ok(false)
+        | "_install" => Ok(false)
+        | base when base.[0] == '.' => Ok(false)
+        | _ => Ok(true)
+        }
+    );
+  Result.join(
+    Bos.OS.Path.fold(
+      ~dotfiles=true,
+      ~traverse,
+      visit,
+      Ok(0.),
+      [spec.sourcePath]
+    )
+  );
+};
+
 let doNothing = (_config: Config.t, _spec: BuildSpec.t) => Run.ok;
 
 /**
@@ -230,18 +263,67 @@ let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, run) => 
   result;
 };
 
-let build = (~buildOnly=true, config, spec) => {
+let build =
+    (~buildOnly=true, ~force=false, config: Config.t, spec: BuildSpec.t) => {
   open Run;
-  let runBuildAndInstall = (run, ()) => {
-    let {BuildSpec.build, install, _} = spec;
-    let%bind () = run(build);
+  Logs.app(m => m("# ESYB: start %s", spec.id));
+  let performBuild = sourceModTime => {
+    Logs.app(m => m("# ESYB: building"));
+    let runBuildAndInstall = (run, ()) => {
+      let {BuildSpec.build, install, _} = spec;
+      let%bind () = run(build);
+      let%bind () =
+        if (! buildOnly) {
+          run(install);
+        } else {
+          ok;
+        };
+      ok;
+    };
+    let startTime = Unix.gettimeofday();
     let%bind () =
-      if (! buildOnly) {
-        run(install);
-      } else {
-        ok;
-      };
-    ok;
+      withBuildEnv(~commit=! buildOnly, config, spec, runBuildAndInstall);
+    let%bind info = {
+      let%bind sourceModTime =
+        switch (sourceModTime, spec.sourceType) {
+        | (None, BuildSpec.Root)
+        | (None, BuildSpec.Transient) =>
+          let%bind v = findSourceModTime(spec);
+          Ok(Some(v));
+        | (v, _) => Ok(v)
+        };
+      Ok(
+        BuildInfo.{sourceModTime, timeSpent: Unix.gettimeofday() -. startTime}
+      );
+    };
+    BuildInfo.write(config, spec, info);
   };
-  withBuildEnv(~commit=! buildOnly, config, spec, runBuildAndInstall);
+  switch (force, spec.sourceType) {
+  | (true, _) =>
+    Logs.app(m => m("# ESYB: forcing build"));
+    performBuild(None);
+  | (false, BuildSpec.Transient)
+  | (false, BuildSpec.Root) =>
+    Logs.app(m => m("# ESYB: checking for staleness"));
+    let info = BuildInfo.read(config, spec);
+    let prevSourceModTime =
+      Option.bind(~f=v => v.BuildInfo.sourceModTime, info);
+    let%bind sourceModTime = findSourceModTime(spec);
+    switch prevSourceModTime {
+    | Some(prevSourceModTime) when sourceModTime > prevSourceModTime =>
+      performBuild(Some(sourceModTime))
+    | None => performBuild(Some(sourceModTime))
+    | Some(_) =>
+      Logs.app(m => m("# ESYB: source code is not modified, skipping"));
+      ok;
+    };
+  | (false, BuildSpec.Immutable) =>
+    let%bind installPathExists = exists(spec.installPath);
+    if (installPathExists) {
+      Logs.app(m => m("# ESYB: build exists in store, skipping"));
+      ok;
+    } else {
+      performBuild(None);
+    };
+  };
 };

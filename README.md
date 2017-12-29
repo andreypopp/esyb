@@ -53,6 +53,24 @@ Note that some properties are allowed to use `%name%` variables:
 
 This is needed to allow build descriptions not to be tied to a concrete host.
 
+Examples:
+
+Build the project using `$PWD/build.json` description:
+```
+% esyb build
+```
+
+Build the project using the specified build description:
+```
+% esyb build -B build-merlin.json
+```
+
+Build description can also be read from stdin (useful for automatically
+generated build descriptions):
+```
+% cat build-merlin.json | esyb build -B -
+```
+
 ## Development
 
 Right now it requires `fastreplacestring.exe` and `rsync` to be available on

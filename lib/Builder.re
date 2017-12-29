@@ -296,7 +296,7 @@ let build =
         BuildInfo.{sourceModTime, timeSpent: Unix.gettimeofday() -. startTime}
       );
     };
-    BuildInfo.write(config, spec, info);
+    BuildInfo.write(spec, info);
   };
   switch (force, spec.sourceType) {
   | (true, _) =>
@@ -305,7 +305,7 @@ let build =
   | (false, BuildSpec.Transient)
   | (false, BuildSpec.Root) =>
     Logs.app(m => m("# ESYB: checking for staleness"));
-    let info = BuildInfo.read(config, spec);
+    let info = BuildInfo.read(spec);
     let prevSourceModTime =
       Option.bind(~f=v => v.BuildInfo.sourceModTime, info);
     let%bind sourceModTime = findSourceModTime(spec);

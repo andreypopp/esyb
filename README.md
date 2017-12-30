@@ -71,15 +71,17 @@ generated build descriptions):
 % cat build-merlin.json | esyb build -B -
 ```
 
+## Requirements
+
+- `rsync` executable
+
 ## Development
 
-Right now it requires `fastreplacestring.exe` and `rsync` to be available on
-`$PATH`.
+install `esy`, install dependencies and build:
 
 ```
 % npm install -g esy
 % make install build-dev
-% esy x esyb
 ```
 
 Then you can test it:

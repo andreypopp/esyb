@@ -17,12 +17,37 @@ type commonOpts = {
   sandboxPath: option(Fpath.t)
 };
 
+let createConfig = (copts: commonOpts) => {
+  open Run;
+  let {prefixPath, sandboxPath, _} = copts;
+  /*
+   * Try to resolve fastreplacestring.exe from the location of esyb executable.
+   * This is a temp solution, the better solution would be to use Node
+   * resolution alog for that.
+   */
+  let%bind fastreplacestringCmd = {
+    let program = Sys.argv[0];
+    let%bind program = realpath(v(program));
+    let basedir = Fpath.parent(program);
+    switch%bind (
+      NodeResolution.resolve(
+        "fastreplacestring/.bin/fastreplacestring.exe",
+        basedir
+      )
+    ) {
+    | Some(path) => Ok(Fpath.to_string(path))
+    | None => Ok("fastreplacestring.exe")
+    };
+  };
+  Config.create(~prefixPath, ~sandboxPath, ~fastreplacestringCmd, ());
+};
+
 let build = (~buildOnly=false, ~force=false, copts: commonOpts) => {
   open Run;
   Logs.set_reporter(Logs_fmt.reporter());
-  let {prefixPath, sandboxPath, buildPath, _} = copts;
+  let {buildPath, _} = copts;
   let buildPath = Option.orDefault(v("build.json"), buildPath);
-  let%bind config = Config.create(~prefixPath, ~sandboxPath, ());
+  let%bind config = createConfig(copts);
   let%bind spec = BuildSpec.ofFile(config, buildPath);
   let%bind () = Builder.build(~buildOnly, ~force, config, spec);
   Ok();
@@ -31,14 +56,20 @@ let build = (~buildOnly=false, ~force=false, copts: commonOpts) => {
 let shell = (copts: commonOpts) => {
   open Run;
   Logs.set_reporter(Logs_fmt.reporter());
-  let {prefixPath, sandboxPath, buildPath, _} = copts;
+  let {buildPath, _} = copts;
   let buildPath = Option.orDefault(v("build.json"), buildPath);
-  let%bind config = Config.create(~prefixPath, ~sandboxPath, ());
+  let%bind config = createConfig(copts);
   let runShell = (run, ()) => {
     let%bind rcFilename =
-      putTempFile({|
+      putTempFile(
+        {|
         export PS1="[build $cur__name] % ";
-      |});
+
+        echo ""
+        echo "  esy build shell for $cur__name@$cur__version package"
+        echo ""
+        |}
+      );
     let cmd =
       Bos.Cmd.of_list([
         "bash",
@@ -56,9 +87,9 @@ let shell = (copts: commonOpts) => {
 let exec = (copts, command) => {
   open Run;
   Logs.set_reporter(Logs_fmt.reporter());
-  let {prefixPath, sandboxPath, buildPath, _} = copts;
+  let {buildPath, _} = copts;
   let buildPath = Option.orDefault(v("build.json"), buildPath);
-  let%bind config = Config.create(~prefixPath, ~sandboxPath, ());
+  let%bind config = createConfig(copts);
   let runCommand = (run, ()) => {
     let cmd = Bos.Cmd.of_list(command);
     run([cmd]);

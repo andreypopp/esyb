@@ -3,8 +3,16 @@
   "version": "0.1.0",
   "description": "Package builder for esy",
   "license": "MIT",
+  "bin": {
+    "esyb": "esyb"
+  },
+  "scripts": {
+    "postinstall": "bash postinstall.sh"
+  },
   "files": [
-    "_build/default/bin/esyb.bc"
+    "esyb",
+    "esyb.bc",
+    "postinstall.sh"
   ],
   "dependencies": {
     "@esy-ocaml/ocamlrun": "4.6.0",

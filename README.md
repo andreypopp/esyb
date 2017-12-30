@@ -78,9 +78,39 @@ Right now it requires `fastreplacestring.exe` and `rsync` to be available on
 
 ```
 % npm install -g esy
-% esy install
-% esy build
+% make install build-dev
 % esy x esyb
+```
+
+Then you can test it:
+
+```
+% esy x esyb
+```
+
+## Publishing a release
+
+Things to consider:
+
+- `package.json` contains npm metadata for a dist package, you can bump version
+  in there using `npm version patch|minor|major` or othewise edit it however you
+  need. Note that the list of files in to be included in the dist is also
+  hardcoded in `Makefile`.
+
+- `postinstall.sh` contains a list of instructions to be performed after the
+  installation.
+
+Produce a ready to be published release package within the `dist/` directory:
+
+```
+% make dist
+```
+
+Publish it:
+
+```
+% cd dist/
+% npm publish
 ```
 
 [esy]: http://esy.sh

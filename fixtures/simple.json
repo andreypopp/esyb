@@ -1,5 +1,5 @@
 {
-  "id": "pkg-1.0.0-somehash",
+  "id": "pkg-1.0.0",
   "name": "pkg",
   "version": "1.0.0",
   "sourceType": "immutable",
@@ -8,31 +8,10 @@
     [
       "echo",
       "build"
-    ],
-    [
-      "env"
     ]
   ],
-  "install": [
-    [
-      "echo",
-      "install"
-    ],
-    [
-      "bash",
-      "-c",
-      "echo %localStore%/s/name/path > %localStore%/s/name/test"
-    ],
-    [
-      "bash",
-      "-c",
-      "ln -s %localStore%/s/name/test %localStore%/s/name/testlink"
-    ]
-  ],
-  "sourceDir": "%sandbox%",
-  "stageDir": "%localStore%/s/name",
-  "installDir": "%localStore%/i/name",
-  "buildDir": "%localStore%/b/name",
+  "install": [],
+  "sourcePath": "%sandbox%",
   "env": {
     "cur__name": "pkg",
     "cur__install": "%localStore%/s/name"

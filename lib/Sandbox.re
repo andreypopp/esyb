@@ -45,12 +45,12 @@ module Darwin: Sandbox = {
         Bos.Cmd.of_list([
           "sandbox-exec",
           "-f",
-          Fpath.to_string(configFilename)
+          Path.to_string(configFilename)
         ]);
       let command = Bos.Cmd.(sandboxCommand %% command);
       let (inp, outp, err) =
         if (! quiet) {
-          (in_stdin, to_stdout, err_stderr);
+          (in_stdin, to_stdout, err_run_out);
         } else {
           (in_null, to_null, err_null);
         };
@@ -68,7 +68,7 @@ module NoSandbox: Sandbox = {
         if (! quiet) {
           (in_stdin, to_stdout, err_stderr);
         } else {
-          (in_null, to_null, err_null);
+          (in_null, to_null, err_run_out);
         };
       inp |> run_io(~env, ~err, command) |> outp;
     };

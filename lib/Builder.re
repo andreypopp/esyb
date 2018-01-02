@@ -21,7 +21,7 @@ let relocateSourcePath = (config: Config.t, spec: BuildSpec.t) => {
        * origPath rather than the origPath itself into destPath, see "man rsync" for
        * details.
        */
-      % (Fpath.to_string(spec.sourcePath) ++ "/")
+      % (Path.to_string(spec.sourcePath) ++ "/")
       % p(spec.buildPath)
     );
   Bos.OS.Cmd.run(cmd);
@@ -42,16 +42,16 @@ let commitBuildToStore = (config: Config.t, spec: BuildSpec.t) => {
   };
   let rewriteTargetInSymlink = (~origPrefix, ~destPrefix, path) => {
     let%bind targetPath = symlink_target(path);
-    switch (Fpath.rem_prefix(origPrefix, targetPath)) {
+    switch (Path.rem_prefix(origPrefix, targetPath)) {
     | Some(basePath) =>
-      let nextTargetPath = Fpath.append(destPrefix, basePath);
+      let nextTargetPath = Path.append(destPrefix, basePath);
       let%bind () = rm(path);
       let%bind () = symlink(~target=nextTargetPath, path);
       ok;
     | None => ok
     };
   };
-  let relocate = (path: Fpath.t, stats: Unix.stats) =>
+  let relocate = (path: Path.t, stats: Unix.stats) =>
     switch stats.st_kind {
     | Unix.S_REG =>
       rewritePrefixInFile(
@@ -108,7 +108,7 @@ let relocateBuildPath = (_config: Config.t, spec: BuildSpec.t) => {
 
 let findSourceModTime = (spec: BuildSpec.t) => {
   open Run;
-  let visit = (path: Fpath.t) =>
+  let visit = (path: Path.t) =>
     fun
     | Ok(maxTime) => {
         let%bind {Unix.st_mtime: time, _} = Bos.OS.Path.symlink_stat(path);
@@ -118,7 +118,7 @@ let findSourceModTime = (spec: BuildSpec.t) => {
   let traverse =
     `Sat(
       path =>
-        switch (Fpath.basename(path)) {
+        switch (Path.basename(path)) {
         | "node_modules" => Ok(false)
         | "_esy" => Ok(false)
         | "_release" => Ok(false)
@@ -161,18 +161,18 @@ let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, run) => 
     open Sandbox;
     let regex = (base, segments) => {
       let pat =
-        String.concat(Fpath.dir_sep, [Fpath.to_string(base), ...segments]);
+        String.concat(Path.dir_sep, [Path.to_string(base), ...segments]);
       Regex(pat);
     };
     let%bind tempPath = {
-      let v = Fpath.v(Bos.OS.Env.opt_var("TMPDIR", ~absent="/tmp"));
+      let v = Path.v(Bos.OS.Env.opt_var("TMPDIR", ~absent="/tmp"));
       let%bind v = realpath(v);
-      Ok(Fpath.to_string(v));
+      Ok(Path.to_string(v));
     };
     let allowWriteToSourcePath =
       switch spec.buildType {
       | JbuilderLike => [
-          Subpath(Fpath.to_string(sourcePath / "_build")),
+          Subpath(Path.to_string(sourcePath / "_build")),
           regex(sourcePath, [".*", "[^/]*\\.install"]),
           regex(sourcePath, ["[^/]*\\.install"]),
           regex(sourcePath, [".*", "[^/]*\\.opam"]),
@@ -186,8 +186,8 @@ let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, run) => 
       @ [
         regex(sourcePath, [".*", "\\.merlin"]),
         regex(sourcePath, ["\\.merlin"]),
-        Subpath(Fpath.to_string(buildPath)),
-        Subpath(Fpath.to_string(stagePath)),
+        Subpath(Path.to_string(buildPath)),
+        Subpath(Path.to_string(stagePath)),
         Subpath("/private/tmp"),
         Subpath("/tmp"),
         Subpath(tempPath)
@@ -255,8 +255,8 @@ let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, run) => 
       let%bind () = completeRootPath(config, spec);
       error;
     };
-  let%bind _store = Store.create(config.storePath);
-  let%bind _localStore = Store.create(config.localStorePath);
+  let%bind () = Store.init(config.storePath);
+  let%bind () = Store.init(config.localStorePath);
   let%bind () = prepare();
   let result = withCwd(rootPath, ~f=run(runCommands));
   let%bind () = finalize(result);

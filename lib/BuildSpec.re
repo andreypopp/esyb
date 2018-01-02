@@ -42,19 +42,6 @@ module Cmd = {
     );
 };
 
-module Fpath = {
-  include Fpath;
-  let of_yojson = (json: Yojson.Safe.json) =>
-    switch json {
-    | `String(v) =>
-      switch (Fpath.of_string(v)) {
-      | Ok(v) => Ok(v)
-      | Error(`Msg(msg)) => Error(msg)
-      }
-    | _ => Error("invalid path")
-    };
-};
-
 module Env = {
   type t = Bos.OS.Env.t;
   let pp = (_fmt, _env) => ();
@@ -72,7 +59,7 @@ module Env = {
     };
 };
 
-[@deriving (show, of_yojson)]
+[@deriving show]
 type t = {
   id: string,
   name: string,
@@ -81,68 +68,91 @@ type t = {
   buildType,
   build: list(Cmd.t),
   install: list(Cmd.t),
-  sourcePath: Fpath.t,
-  stagePath: Fpath.t,
-  installPath: Fpath.t,
-  buildPath: Fpath.t,
+  sourcePath: Path.t,
+  stagePath: Path.t,
+  installPath: Path.t,
+  buildPath: Path.t,
   env: Env.t
 };
 
-let renderBuild = (config: Config.t, spec: t) => {
-  open Result;
-  let lookupVar =
-    fun
-    | "sandbox" => Some(Fpath.to_string(config.sandboxPath))
-    | "store" => Some(Fpath.to_string(config.storePath))
-    | "localStore" => Some(Fpath.to_string(config.localStorePath))
-    | _ => None;
-  let render = s => PathSyntax.render(lookupVar, s);
-  let renderPath = s => {
-    let s = Fpath.to_string(s);
-    let%bind s = PathSyntax.render(lookupVar, s);
-    Fpath.of_string(s);
+type spec = t;
+
+module ConfigFile = {
+  [@deriving (show, of_yojson)]
+  type t = {
+    id: string,
+    name: string,
+    version: string,
+    sourceType,
+    buildType,
+    build: list(Cmd.t),
+    install: list(Cmd.t),
+    sourcePath: Path.t,
+    env: Env.t
   };
-  let renderCommand = s =>
-    s
-    |> Bos.Cmd.to_list
-    |> Result.listMap(render)
-    |> Result.map(Bos.Cmd.of_list);
-  let renderEnv = env => {
-    let f = (k, v) =>
+  let configure = (config: Config.t, specConfig: t) : Run.t(spec, 'a) => {
+    open Result;
+    let lookupVar =
       fun
-      | Ok(result) => {
-          let%bind v = render(v);
-          Ok(Astring.String.Map.add(k, v, result));
-        }
-      | error => error;
-    Astring.String.Map.fold(f, env, Ok(Astring.String.Map.empty));
+      | "sandbox" => Some(Path.to_string(config.sandboxPath))
+      | "store" => Some(Path.to_string(config.storePath))
+      | "localStore" => Some(Path.to_string(config.localStorePath))
+      | _ => None;
+    let render = s => PathSyntax.render(lookupVar, s);
+    let renderPath = s => {
+      let s = Path.to_string(s);
+      let%bind s = PathSyntax.render(lookupVar, s);
+      Path.of_string(s);
+    };
+    let renderCommand = s =>
+      s
+      |> Bos.Cmd.to_list
+      |> Result.listMap(render)
+      |> Result.map(Bos.Cmd.of_list);
+    let renderEnv = env => {
+      let f = (k, v) =>
+        fun
+        | Ok(result) => {
+            let%bind v = render(v);
+            Ok(Astring.String.Map.add(k, v, result));
+          }
+        | error => error;
+      Astring.String.Map.fold(f, env, Ok(Astring.String.Map.empty));
+    };
+    let renderCommands = commands => Result.listMap(renderCommand, commands);
+    let storePath =
+      switch specConfig.sourceType {
+      | Immutable => config.storePath
+      | Transient
+      | Root => config.localStorePath
+      };
+    let%bind sourcePath = renderPath(specConfig.sourcePath);
+    let%bind env = renderEnv(specConfig.env);
+    let%bind install = renderCommands(specConfig.install);
+    let%bind build = renderCommands(specConfig.build);
+    Ok({
+      id: specConfig.id,
+      name: specConfig.name,
+      version: specConfig.version,
+      buildType: specConfig.buildType,
+      sourceType: specConfig.sourceType,
+      installPath: Path.(storePath / Config.storeInstallTree / specConfig.id),
+      stagePath: Path.(storePath / Config.storeStageTree / specConfig.id),
+      buildPath: Path.(storePath / Config.storeBuildTree / specConfig.id),
+      sourcePath,
+      env,
+      install,
+      build
+    });
   };
-  let renderCommands = commands => Result.listMap(renderCommand, commands);
-  let%bind installPath = renderPath(spec.installPath);
-  let%bind stagePath = renderPath(spec.stagePath);
-  let%bind buildPath = renderPath(spec.buildPath);
-  let%bind sourcePath = renderPath(spec.sourcePath);
-  let%bind env = renderEnv(spec.env);
-  let%bind install = renderCommands(spec.install);
-  let%bind build = renderCommands(spec.build);
-  Ok({
-    ...spec,
-    installPath,
-    stagePath,
-    buildPath,
-    sourcePath,
-    env,
-    install,
-    build
-  });
 };
 
-let ofFile = (config: Config.t, path: Fpath.t) =>
+let ofFile = (config: Config.t, path: Path.t) =>
   Run.(
     {
       let%bind data = Bos.OS.File.read(path);
-      let%bind spec = Json.parseWith(of_yojson, data);
-      let%bind spec = renderBuild(config, spec);
+      let%bind spec = Json.parseWith(ConfigFile.of_yojson, data);
+      let%bind spec = ConfigFile.configure(config, spec);
       Ok(spec);
     }
   );

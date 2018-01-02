@@ -1,7 +1,7 @@
 /**
  * This module implements utilities which are used to "script" build processes.
  */
-type t('a) = result(unit, [> Rresult.R.msg] as 'a);
+type t('a, 'b) = result('a, [> Rresult.R.msg] as 'b);
 
 let ok = Result.ok;
 

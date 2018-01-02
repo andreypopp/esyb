@@ -266,9 +266,9 @@ let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, run) => 
 let build =
     (~buildOnly=true, ~force=false, config: Config.t, spec: BuildSpec.t) => {
   open Run;
-  Logs.app(m => m("# ESYB: start %s", spec.id));
+  Logs.info(m => m("start %s", spec.id));
   let performBuild = sourceModTime => {
-    Logs.app(m => m("# ESYB: building"));
+    Logs.info(m => m("building"));
     let runBuildAndInstall = (run, ()) => {
       let {BuildSpec.build, install, _} = spec;
       let%bind () = run(build);
@@ -300,11 +300,11 @@ let build =
   };
   switch (force, spec.sourceType) {
   | (true, _) =>
-    Logs.app(m => m("# ESYB: forcing build"));
+    Logs.info(m => m("forcing build"));
     performBuild(None);
   | (false, BuildSpec.Transient)
   | (false, BuildSpec.Root) =>
-    Logs.app(m => m("# ESYB: checking for staleness"));
+    Logs.info(m => m("checking for staleness"));
     let info = BuildInfo.read(spec);
     let prevSourceModTime =
       Option.bind(~f=v => v.BuildInfo.sourceModTime, info);
@@ -314,13 +314,13 @@ let build =
       performBuild(Some(sourceModTime))
     | None => performBuild(Some(sourceModTime))
     | Some(_) =>
-      Logs.app(m => m("# ESYB: source code is not modified, skipping"));
+      Logs.info(m => m("source code is not modified, skipping"));
       ok;
     };
   | (false, BuildSpec.Immutable) =>
     let%bind installPathExists = exists(spec.installPath);
     if (installPathExists) {
-      Logs.app(m => m("# ESYB: build exists in store, skipping"));
+      Logs.info(m => m("build exists in store, skipping"));
       ok;
     } else {
       performBuild(None);

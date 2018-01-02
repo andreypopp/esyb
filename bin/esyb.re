@@ -10,11 +10,17 @@ type verb =
   | Verbose;
 
 type commonOpts = {
-  debug: bool,
-  verb,
   buildPath: option(Fpath.t),
   prefixPath: option(Fpath.t),
   sandboxPath: option(Fpath.t)
+};
+
+let setupLog = (style_renderer, level) => {
+  let style_renderer = Option.orDefault(`None, style_renderer);
+  Fmt_tty.setup_std_outputs(~style_renderer, ());
+  Logs.set_level(level);
+  Logs.set_reporter(Logs_fmt.reporter());
+  ();
 };
 
 let createConfig = (copts: commonOpts) => {
@@ -44,7 +50,6 @@ let createConfig = (copts: commonOpts) => {
 
 let build = (~buildOnly=false, ~force=false, copts: commonOpts) => {
   open Run;
-  Logs.set_reporter(Logs_fmt.reporter());
   let {buildPath, _} = copts;
   let buildPath = Option.orDefault(v("build.json"), buildPath);
   let%bind config = createConfig(copts);
@@ -55,7 +60,6 @@ let build = (~buildOnly=false, ~force=false, copts: commonOpts) => {
 
 let shell = (copts: commonOpts) => {
   open Run;
-  Logs.set_reporter(Logs_fmt.reporter());
   let {buildPath, _} = copts;
   let buildPath = Option.orDefault(v("build.json"), buildPath);
   let%bind config = createConfig(copts);
@@ -86,7 +90,6 @@ let shell = (copts: commonOpts) => {
 
 let exec = (copts, command) => {
   open Run;
-  Logs.set_reporter(Logs_fmt.reporter());
   let {buildPath, _} = copts;
   let buildPath = Option.orDefault(v("build.json"), buildPath);
   let%bind config = createConfig(copts);
@@ -139,9 +142,7 @@ let () = {
     `P("Check bug reports at https://github.com/esy/esy.")
   ];
   /* Options common to all commands */
-  let commonOpts = (debug, verb, prefixPath, sandboxPath, buildPath) => {
-    debug,
-    verb,
+  let commonOpts = (prefixPath, sandboxPath, buildPath, ()) => {
     prefixPath,
     sandboxPath,
     buildPath
@@ -153,17 +154,6 @@ let () = {
   };
   let commonOptsT = {
     let docs = Manpage.s_common_options;
-    let debug = {
-      let doc = "Give only debug output.";
-      Arg.(value & flag & info(["debug"], ~docs, ~doc));
-    };
-    let verb = {
-      let doc = "Suppress informational output.";
-      let quiet = (Quiet, Arg.info(["q", "quiet"], ~docs, ~doc));
-      let doc = "Give verbose output.";
-      let verbose = (Verbose, Arg.info(["v", "verbose"], ~docs, ~doc));
-      Arg.(last & vflag_all([Normal], [quiet, verbose]));
-    };
     let prefixPath = {
       let doc = "Specifies esy prefix path.";
       let env = Arg.env_var("ESY__PREFIX", ~doc);
@@ -191,8 +181,10 @@ let () = {
         & info(["build", "B"], ~env, ~docs, ~docv="PATH", ~doc)
       );
     };
+    let setupLogT =
+      Term.(const(setupLog) $ Fmt_cli.style_renderer() $ Logs_cli.level());
     Term.(
-      const(commonOpts) $ debug $ verb $ prefixPath $ sandboxPath $ buildPath
+      const(commonOpts) $ prefixPath $ sandboxPath $ buildPath $ setupLogT
     );
   };
   /* Command terms */

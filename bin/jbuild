@@ -5,4 +5,4 @@
   (public_name esyb)
   (modes (byte))
   (preprocess (pps (ppx_let)))
-  (libraries (cmdliner yojson bos EsyLib logs logs.fmt re))))
+  (libraries (cmdliner yojson bos EsyLib logs logs.fmt logs.cli re fmt fmt.cli fmt.tty))))

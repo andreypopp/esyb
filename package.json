@@ -15,7 +15,7 @@
     "postinstall.sh"
   ],
   "dependencies": {
-    "@esy-ocaml/ocamlrun": "4.6.1",
+    "@esy-ocaml/ocamlrun": "4.6.2",
     "fastreplacestring": "git+https://github.com/IwanKaramazow/FastReplaceString.git#0.0.4"
   }
 }

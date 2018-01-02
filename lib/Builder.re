@@ -67,6 +67,11 @@ let commitBuildToStore = (config: Config.t, spec: BuildSpec.t) => {
       )
     | _ => Ok()
     };
+  let%bind () =
+    Bos.OS.File.write(
+      Path.(spec.stagePath / "_esy" / "storePrefix"),
+      Path.to_string(config.storePath)
+    );
   let%bind () = traverse(spec.stagePath, relocate);
   let%bind () = Bos.OS.Path.move(spec.stagePath, spec.installPath);
   ok;
@@ -221,6 +226,7 @@ let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, f) => {
     let%bind () = mkdir(stagePath / "man");
     let%bind () = mkdir(stagePath / "share");
     let%bind () = mkdir(stagePath / "doc");
+    let%bind () = mkdir(stagePath / "_esy");
     let%bind () =
       switch (spec.sourceType, spec.buildType) {
       | (Immutable, _)

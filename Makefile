@@ -16,6 +16,9 @@ dist::
 	@$(MAKE) $(DIST_FILES:%=dist/%)
 	touch dist/esyb
 
+publish: dist
+	cd dist && npm publish
+
 dist/esyb.bc: _build/default/bin/esyb.bc
 	esy ocamlstripdebug _build/default/bin/esyb.bc dist/esyb.bc
 

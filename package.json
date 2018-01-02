@@ -1,6 +1,6 @@
 {
   "name": "@esy-ocaml/esyb",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Package builder for esy",
   "license": "MIT",
   "bin": {

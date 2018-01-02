@@ -12,7 +12,8 @@ type verb =
 type commonOpts = {
   buildPath: option(Fpath.t),
   prefixPath: option(Fpath.t),
-  sandboxPath: option(Fpath.t)
+  sandboxPath: option(Fpath.t),
+  logLevel: option(Logs.level)
 };
 
 let setupLog = (style_renderer, level) => {
@@ -20,7 +21,7 @@ let setupLog = (style_renderer, level) => {
   Fmt_tty.setup_std_outputs(~style_renderer, ());
   Logs.set_level(level);
   Logs.set_reporter(Logs_fmt.reporter());
-  ();
+  level;
 };
 
 let createConfig = (copts: commonOpts) => {
@@ -54,7 +55,14 @@ let build = (~buildOnly=false, ~force=false, copts: commonOpts) => {
   let buildPath = Option.orDefault(v("build.json"), buildPath);
   let%bind config = createConfig(copts);
   let%bind spec = BuildSpec.ofFile(config, buildPath);
-  let%bind () = Builder.build(~buildOnly, ~force, config, spec);
+  let%bind () =
+    Builder.build(
+      ~buildOnly,
+      ~force,
+      ~quiet=Option.isNone(copts.logLevel),
+      config,
+      spec
+    );
   Ok();
 };
 
@@ -81,7 +89,7 @@ let shell = (copts: commonOpts) => {
         "--rcfile",
         Fpath.to_string(rcFilename)
       ]);
-    run([cmd]);
+    run(~quiet=false, [cmd]);
   };
   let%bind spec = BuildSpec.ofFile(config, buildPath);
   let%bind () = Builder.withBuildEnv(config, spec, runShell);
@@ -95,7 +103,7 @@ let exec = (copts, command) => {
   let%bind config = createConfig(copts);
   let runCommand = (run, ()) => {
     let cmd = Bos.Cmd.of_list(command);
-    run([cmd]);
+    run(~quiet=false, [cmd]);
   };
   let%bind spec = BuildSpec.ofFile(config, buildPath);
   let%bind () = Builder.withBuildEnv(config, spec, runCommand);
@@ -142,10 +150,11 @@ let () = {
     `P("Check bug reports at https://github.com/esy/esy.")
   ];
   /* Options common to all commands */
-  let commonOpts = (prefixPath, sandboxPath, buildPath, ()) => {
+  let commonOpts = (prefixPath, sandboxPath, buildPath, logLevel) => {
     prefixPath,
     sandboxPath,
-    buildPath
+    buildPath,
+    logLevel
   };
   let path = {
     let parse = Fpath.of_string;

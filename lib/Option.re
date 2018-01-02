@@ -12,3 +12,8 @@ let bind = (~f) =>
   fun
   | Some(v) => f(v)
   | None => None;
+
+let isNone =
+  fun
+  | None => true
+  | _ => false;

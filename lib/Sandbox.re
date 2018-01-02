@@ -8,7 +8,8 @@ module type Sandbox = {
   let sandboxExec:
     config =>
     result(
-      (~env: Bos.OS.Env.t, Bos.Cmd.t) => result(unit, [> Result.R.msg]),
+      (~quiet: bool, ~env: Bos.OS.Env.t, Bos.Cmd.t) =>
+      result(unit, [> Result.R.msg]),
       [> Rresult.R.msg] as 'a
     );
 };
@@ -38,7 +39,8 @@ module Darwin: Sandbox = {
     open Run;
     let configData = renderConfig(config);
     let%bind configFilename = putTempFile(configData);
-    let exec = (~env, command) => {
+    let exec = (~quiet, ~env, command) => {
+      open Bos.OS.Cmd;
       let sandboxCommand =
         Bos.Cmd.of_list([
           "sandbox-exec",
@@ -46,7 +48,13 @@ module Darwin: Sandbox = {
           Fpath.to_string(configFilename)
         ]);
       let command = Bos.Cmd.(sandboxCommand %% command);
-      Bos.OS.Cmd.run(~env, command);
+      let (inp, outp, err) =
+        if (! quiet) {
+          (in_stdin, to_stdout, err_stderr);
+        } else {
+          (in_null, to_null, err_null);
+        };
+      inp |> run_io(~env, ~err, command) |> outp;
     };
     Ok(exec);
   };
@@ -54,7 +62,16 @@ module Darwin: Sandbox = {
 
 module NoSandbox: Sandbox = {
   let sandboxExec = _config => {
-    let exec = (~env, command) => Bos.OS.Cmd.run(~env, command);
+    let exec = (~quiet, ~env, command) => {
+      open Bos.OS.Cmd;
+      let (inp, outp, err) =
+        if (! quiet) {
+          (in_stdin, to_stdout, err_stderr);
+        } else {
+          (in_null, to_null, err_null);
+        };
+      inp |> run_io(~env, ~err, command) |> outp;
+    };
     Ok(exec);
   };
 };

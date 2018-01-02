@@ -200,12 +200,12 @@ let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, run) => 
     | None => spec.env
     };
   let%bind commandExec = Sandbox.sandboxExec({allowWrite: sandboxConfig});
-  let rec runCommands = commands =>
+  let rec runCommands = (~quiet, commands) =>
     switch commands {
     | [] => Ok()
     | [cmd, ...cmds] =>
-      switch (commandExec(~env, cmd)) {
-      | Ok(_) => runCommands(cmds)
+      switch (commandExec(~quiet, ~env, cmd)) {
+      | Ok(_) => runCommands(~quiet, cmds)
       | Error(err) => Error(err)
       }
     };
@@ -264,17 +264,23 @@ let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, run) => 
 };
 
 let build =
-    (~buildOnly=true, ~force=false, config: Config.t, spec: BuildSpec.t) => {
+    (
+      ~buildOnly=true,
+      ~force=false,
+      ~quiet=false,
+      config: Config.t,
+      spec: BuildSpec.t
+    ) => {
   open Run;
-  Logs.info(m => m("start %s", spec.id));
+  Logs.debug(m => m("start %s", spec.id));
   let performBuild = sourceModTime => {
-    Logs.info(m => m("building"));
+    Logs.debug(m => m("building"));
     let runBuildAndInstall = (run, ()) => {
       let {BuildSpec.build, install, _} = spec;
-      let%bind () = run(build);
+      let%bind () = run(~quiet, build);
       let%bind () =
         if (! buildOnly) {
-          run(install);
+          run(~quiet, install);
         } else {
           ok;
         };
@@ -300,11 +306,11 @@ let build =
   };
   switch (force, spec.sourceType) {
   | (true, _) =>
-    Logs.info(m => m("forcing build"));
+    Logs.debug(m => m("forcing build"));
     performBuild(None);
   | (false, BuildSpec.Transient)
   | (false, BuildSpec.Root) =>
-    Logs.info(m => m("checking for staleness"));
+    Logs.debug(m => m("checking for staleness"));
     let info = BuildInfo.read(spec);
     let prevSourceModTime =
       Option.bind(~f=v => v.BuildInfo.sourceModTime, info);
@@ -314,13 +320,13 @@ let build =
       performBuild(Some(sourceModTime))
     | None => performBuild(Some(sourceModTime))
     | Some(_) =>
-      Logs.info(m => m("source code is not modified, skipping"));
+      Logs.debug(m => m("source code is not modified, skipping"));
       ok;
     };
   | (false, BuildSpec.Immutable) =>
     let%bind installPathExists = exists(spec.installPath);
     if (installPathExists) {
-      Logs.info(m => m("build exists in store, skipping"));
+      Logs.debug(m => m("build exists in store, skipping"));
       ok;
     } else {
       performBuild(None);

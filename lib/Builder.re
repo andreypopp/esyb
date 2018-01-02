@@ -234,7 +234,6 @@ let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, f) => {
       };
     let%bind () = prepareRootPath(config, spec);
     let%bind () = mkdir(buildPath / "_esy");
-    let%bind () = rm(spec.logPath);
     ok;
   };
   /*
@@ -283,7 +282,7 @@ let build =
           };
         _runList(cmds);
       };
-      let {BuildSpec.build, install, logPath, _} = spec;
+      let {BuildSpec.build, install, _} = spec;
       let%bind () = runList(build);
       let%bind () =
         if (! buildOnly) {

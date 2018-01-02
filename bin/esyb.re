@@ -55,14 +55,7 @@ let build = (~buildOnly=false, ~force=false, copts: commonOpts) => {
   let buildPath = Option.orDefault(v("build.json"), buildPath);
   let%bind config = createConfig(copts);
   let%bind spec = BuildSpec.ofFile(config, buildPath);
-  let%bind () =
-    Builder.build(
-      ~buildOnly,
-      ~force,
-      ~quiet=Option.isNone(copts.logLevel),
-      config,
-      spec
-    );
+  let%bind () = Builder.build(~buildOnly, ~force, config, spec);
   Ok();
 };
 
@@ -71,7 +64,7 @@ let shell = (copts: commonOpts) => {
   let {buildPath, _} = copts;
   let buildPath = Option.orDefault(v("build.json"), buildPath);
   let%bind config = createConfig(copts);
-  let runShell = (run, ()) => {
+  let runShell = (_run, runInteractive, ()) => {
     let%bind rcFilename =
       putTempFile(
         {|
@@ -89,7 +82,7 @@ let shell = (copts: commonOpts) => {
         "--rcfile",
         Fpath.to_string(rcFilename)
       ]);
-    run(~quiet=false, [cmd]);
+    runInteractive(cmd);
   };
   let%bind spec = BuildSpec.ofFile(config, buildPath);
   let%bind () = Builder.withBuildEnv(config, spec, runShell);
@@ -101,9 +94,9 @@ let exec = (copts, command) => {
   let {buildPath, _} = copts;
   let buildPath = Option.orDefault(v("build.json"), buildPath);
   let%bind config = createConfig(copts);
-  let runCommand = (run, ()) => {
+  let runCommand = (_run, runInteractive, ()) => {
     let cmd = Bos.Cmd.of_list(command);
-    run(~quiet=false, [cmd]);
+    runInteractive(cmd);
   };
   let%bind spec = BuildSpec.ofFile(config, buildPath);
   let%bind () = Builder.withBuildEnv(config, spec, runCommand);

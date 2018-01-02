@@ -144,7 +144,7 @@ let doNothing = (_config: Config.t, _spec: BuildSpec.t) => Run.ok;
 /**
  * Execute `run` within the build environment for `spec`.
  */
-let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, run) => {
+let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, f) => {
   open Run;
   let {BuildSpec.sourcePath, installPath, buildPath, stagePath, _} = spec;
   let (rootPath, prepareRootPath, completeRootPath) =
@@ -199,16 +199,15 @@ let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, run) => 
     | Some(term) => Astring.String.Map.add("TERM", term, spec.env)
     | None => spec.env
     };
-  let%bind commandExec = Sandbox.sandboxExec({allowWrite: sandboxConfig});
-  let rec runCommands = (~quiet, commands) =>
-    switch commands {
-    | [] => Ok()
-    | [cmd, ...cmds] =>
-      switch (commandExec(~quiet, ~env, cmd)) {
-      | Ok(_) => runCommands(~quiet, cmds)
-      | Error(err) => Error(err)
-      }
-    };
+  let%bind exec = Sandbox.sandboxExec({allowWrite: sandboxConfig});
+  let run = cmd =>
+    Bos.OS.Cmd.(
+      in_null |> exec(~err=Bos.OS.Cmd.err_run_out, ~env, cmd) |> to_stdout
+    );
+  let runInteractive = cmd =>
+    Bos.OS.Cmd.(
+      in_stdin |> exec(~err=Bos.OS.Cmd.err_stderr, ~env, cmd) |> to_stdout
+    );
   /*
    * Prepare build/install.
    */
@@ -235,6 +234,7 @@ let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, run) => 
       };
     let%bind () = prepareRootPath(config, spec);
     let%bind () = mkdir(buildPath / "_esy");
+    let%bind () = rm(spec.logPath);
     ok;
   };
   /*
@@ -258,29 +258,36 @@ let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, run) => 
   let%bind () = Store.init(config.storePath);
   let%bind () = Store.init(config.localStorePath);
   let%bind () = prepare();
-  let result = withCwd(rootPath, ~f=run(runCommands));
+  let result = withCwd(rootPath, ~f=f(run, runInteractive));
   let%bind () = finalize(result);
   result;
 };
 
 let build =
-    (
-      ~buildOnly=true,
-      ~force=false,
-      ~quiet=false,
-      config: Config.t,
-      spec: BuildSpec.t
-    ) => {
+    (~buildOnly=true, ~force=false, config: Config.t, spec: BuildSpec.t) => {
   open Run;
   Logs.debug(m => m("start %s", spec.id));
   let performBuild = sourceModTime => {
     Logs.debug(m => m("building"));
-    let runBuildAndInstall = (run, ()) => {
-      let {BuildSpec.build, install, _} = spec;
-      let%bind () = run(~quiet, build);
+    let runBuildAndInstall = (run, _runInteractive, ()) => {
+      let runList = cmds => {
+        let rec _runList = cmds =>
+          switch cmds {
+          | [] => Ok()
+          | [cmd, ...cmds] =>
+            Logs.app(m => m("# esyb: running: %s", Bos.Cmd.to_string(cmd)));
+            switch (run(cmd)) {
+            | Ok(_) => _runList(cmds)
+            | Error(err) => Error(err)
+            };
+          };
+        _runList(cmds);
+      };
+      let {BuildSpec.build, install, logPath, _} = spec;
+      let%bind () = runList(build);
       let%bind () =
         if (! buildOnly) {
-          run(~quiet, install);
+          runList(install);
         } else {
           ok;
         };

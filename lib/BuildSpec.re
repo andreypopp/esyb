@@ -72,6 +72,8 @@ type t = {
   stagePath: Path.t,
   installPath: Path.t,
   buildPath: Path.t,
+  logPath: Path.t,
+  infoPath: Path.t,
   env: Env.t
 };
 
@@ -139,6 +141,10 @@ module ConfigFile = {
       installPath: Path.(storePath / Config.storeInstallTree / specConfig.id),
       stagePath: Path.(storePath / Config.storeStageTree / specConfig.id),
       buildPath: Path.(storePath / Config.storeBuildTree / specConfig.id),
+      logPath:
+        Path.(storePath / Config.storeBuildTree / (specConfig.id ++ ".log")),
+      infoPath:
+        Path.(storePath / Config.storeBuildTree / (specConfig.id ++ ".info")),
       sourcePath,
       env,
       install,

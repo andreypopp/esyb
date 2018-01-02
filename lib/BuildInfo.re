@@ -7,32 +7,25 @@ type t = {
   sourceModTime: option(float)
 };
 
-let path = (spec: BuildSpec.t) => {
-  let storeBuildTree = Fpath.parent(spec.buildPath);
-  Fpath.(storeBuildTree / (spec.id ++ ".info"));
-};
-
 let write = (spec: BuildSpec.t, info: t) => {
   let write = (oc, ()) => {
     Yojson.Safe.pretty_to_channel(oc, to_yojson(info));
     Run.ok;
   };
-  let path = path(spec);
-  Result.join(Bos.OS.File.with_oc(path, write, ()));
+  Result.join(Bos.OS.File.with_oc(spec.infoPath, write, ()));
 };
 
 let read = (spec: BuildSpec.t) => {
-  let read = {
-    open Run;
-    let path = path(spec);
-    if%bind (exists(path)) {
-      let%bind data = Bos.OS.File.read(path);
-      let%bind info = Json.parseWith(of_yojson, data);
-      Ok(Some(info));
-    } else {
-      Ok(None);
-    };
-  };
+  let read =
+    Run.(
+      if%bind (exists(spec.infoPath)) {
+        let%bind data = Bos.OS.File.read(spec.infoPath);
+        let%bind info = Json.parseWith(of_yojson, data);
+        Ok(Some(info));
+      } else {
+        Ok(None);
+      }
+    );
   switch read {
   | Ok(v) => v
   | Error(_) => None

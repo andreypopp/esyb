@@ -218,6 +218,7 @@ let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, f) => {
    */
   let prepare = () => {
     let%bind () = rmdir(installPath);
+    let%bind () = rmdir(stagePath);
     let%bind () = mkdir(stagePath);
     let%bind () = mkdir(stagePath / "bin");
     let%bind () = mkdir(stagePath / "lib");

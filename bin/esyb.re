@@ -27,11 +27,6 @@ let setupLog = (style_renderer, level) => {
 let createConfig = (copts: commonOpts) => {
   open Run;
   let {prefixPath, sandboxPath, _} = copts;
-  /*
-   * Try to resolve fastreplacestring.exe from the location of esyb executable.
-   * This is a temp solution, the better solution would be to use Node
-   * resolution alog for that.
-   */
   let%bind fastreplacestringCmd = {
     let program = Sys.argv[0];
     let%bind program = realpath(v(program));

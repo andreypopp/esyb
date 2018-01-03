@@ -18,6 +18,7 @@ let resolveCmd = (path, cmd) => {
   let rec _resolveCmd =
     fun
     | [] => Error(`Msg("unable to resolve command: " ++ cmd))
+    | ["", ...xs] => _resolveCmd(xs)
     | [x, ...xs] =>
       switch (find(x)) {
       | Ok(Some(x)) => Ok(Path.to_string(x))

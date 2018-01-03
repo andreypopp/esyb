@@ -15,17 +15,21 @@ let resolveCmd = (path, cmd) => {
     | _ => Ok(None)
     };
   };
-  let rec _resolveCmd =
+  let rec resolve =
     fun
     | [] => Error(`Msg("unable to resolve command: " ++ cmd))
-    | ["", ...xs] => _resolveCmd(xs)
+    | ["", ...xs] => resolve(xs)
     | [x, ...xs] =>
       switch (find(x)) {
       | Ok(Some(x)) => Ok(Path.to_string(x))
       | Ok(None)
-      | Error(_) => _resolveCmd(xs)
+      | Error(_) => resolve(xs)
       };
-  _resolveCmd(path);
+  switch cmd.[0] {
+  | '.'
+  | '/' => Ok(cmd)
+  | _ => resolve(path)
+  };
 };
 
 let resolveInvocation = (path, cmd) => {

@@ -205,14 +205,23 @@ let withBuildEnv = (~commit=false, config: Config.t, spec: BuildSpec.t, f) => {
     | None => spec.env
     };
   let%bind exec = Sandbox.sandboxExec({allowWrite: sandboxConfig});
-  let run = cmd =>
+  let path =
+    switch (Astring.String.Map.find("PATH", env)) {
+    | Some(path) => String.split_on_char(':', path)
+    | None => []
+    };
+  let run = cmd => {
+    let%bind cmd = Cmd.resolveInvocation(path, cmd);
     Bos.OS.Cmd.(
       in_null |> exec(~err=Bos.OS.Cmd.err_run_out, ~env, cmd) |> to_stdout
     );
-  let runInteractive = cmd =>
+  };
+  let runInteractive = cmd => {
+    let%bind cmd = Cmd.resolveInvocation(path, cmd);
     Bos.OS.Cmd.(
       in_stdin |> exec(~err=Bos.OS.Cmd.err_stderr, ~env, cmd) |> to_stdout
     );
+  };
   /*
    * Prepare build/install.
    */

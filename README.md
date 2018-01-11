@@ -1,3 +1,5 @@
+**DEPRECATED: this project was merged into mainline esy/esy repo**
+
 # esyb
 
 A package builder for [esy][].
